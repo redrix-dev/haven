@@ -1,42 +1,39 @@
 -- Pack: volume
--- 3,000 messages in DEV: Hearth #scrollback, spread over the last 60 days,
--- for pagination, scroll restore and day-separator work. Re-running replaces it.
--- Needs pack: community.
+-- 3,000 numbered messages in DEV: Hearth #scrollback, spread over the last 60
+-- days, for paging and scroll tests. Needs the "community" pack. Safe to
+-- re-run.
+--
+-- These are inserted directly, not sent: 3,000 RPC calls would trip the rate
+-- limit and send 3,000 events. Ids are made in insert order, oldest first, so
+-- paging by id walks them in time order.
 
-select test_support.note('seeds/dev/40_volume: 3000 messages in #scrollback');
+select test_support.note('seeds/dev/40_volume: 3,000 messages in #scrollback');
+select test_support.become(null);
 
 do $$
 declare
-  v_community uuid;
   v_channel uuid;
   v_authors uuid[] := array[
-    test_support.fixture_user_id('community_owner'),
-    test_support.fixture_user_id('member_a'),
-    test_support.fixture_user_id('member_b'),
-    test_support.fixture_user_id('server_mod')
-  ];
-  v_names text[] := array['rls_owner', 'rls_member_a', 'rls_member_b', 'rls_server_mod'];
-  v_total constant integer := 3000;
-  v_span constant interval := interval '60 days';
+    test_support.user_id('owner'), test_support.user_id('member_a'),
+    test_support.user_id('member_b'), test_support.user_id('server_mod')];
 begin
-  select c.id into v_community from public.communities c
-  where c.name = 'DEV: Hearth' order by c.created_at limit 1;
-  select id into v_channel from public.channels
-  where community_id = v_community and name = 'scrollback';
+  select ch.id into v_channel
+  from public.channels ch join public.communities c on c.id = ch.community_id
+  where c.name = 'DEV: Hearth' and ch.name = 'scrollback';
   if v_channel is null then
-    raise exception 'Pack "volume" needs pack "community" first.';
+    raise exception 'Seed the "community" pack first: DEV: Hearth #scrollback is missing.';
   end if;
 
-  delete from public.messages where channel_id = v_channel;
+  delete from public.messages m where m.channel_id = v_channel;
 
-  -- Message n is numbered so a missing or duplicated page is obvious on screen.
-  insert into public.messages (community_id, channel_id, author_user_id, display_name, content, created_at)
-  select
-    v_community,
-    v_channel,
-    v_authors[1 + (n % 4)],
-    v_names[1 + (n % 4)],
-    'scrollback #' || n || ' of ' || v_total,
-    timezone('utc', now()) - v_span + (v_span * n / v_total)
-  from generate_series(1, v_total) as n;
+  insert into public.messages (channel_id, author_id, body, created_at)
+  select v_channel, v_authors[1 + (n % 4)], 'Scrollback message #' || n,
+         now() - interval '60 days' + (n * interval '60 days' / 3000)
+  from generate_series(1, 3000) n
+  order by n;
+
+  update public.channels c
+  set latest_message_id = (
+    select m.id from public.messages m where m.channel_id = v_channel order by m.id desc limit 1)
+  where c.id = v_channel;
 end $$;

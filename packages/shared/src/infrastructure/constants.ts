@@ -1,8 +1,4 @@
 import type {
-  NotificationCounts,
-  SocialCounts,
-} from "@shared/lib/backend/types";
-import type {
   AppSettings,
   NotificationAudioSettings,
   VoiceSettings,
@@ -48,16 +44,4 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   autoUpdateEnabled: true,
   notifications: { ...DEFAULT_NOTIFICATION_AUDIO_SETTINGS },
   voice: { ...DEFAULT_VOICE_SETTINGS },
-};
-
-export const DEFAULT_NOTIFICATION_COUNTS: NotificationCounts = {
-  unseenCount: 0,
-  unreadCount: 0,
-};
-
-export const DEFAULT_SOCIAL_COUNTS: SocialCounts = {
-  friendsCount: 0,
-  incomingPendingRequestCount: 0,
-  outgoingPendingRequestCount: 0,
-  blockedUserCount: 0,
 };

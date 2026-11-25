@@ -1,173 +1,131 @@
+import { For, Show, createMemo, createSignal } from "solid-js";
 import {
-  For,
-  Show,
-  createEffect,
-  createMemo,
-  createSignal,
-  untrack,
-} from "solid-js";
-import { useNavigate } from "@solidjs/router";
-import {
-  ChevronDown,
-  ChevronRight,
+  ArrowDown,
+  ArrowUp,
   FolderPlus,
   Pencil,
   Plus,
   ShieldCheck,
   Trash2,
 } from "lucide-solid";
-import type { HavenChannel } from "@shared/nexus/channels/channelTypes";
-import type { ChannelGroup, ChannelKind } from "@shared/lib/backend/types";
+import type { Channel, ChannelCategory } from "@shared/lib/backend/records";
+import { communityChannels } from "@shared/collections/channels/selectors";
+import { categoriesOf } from "@shared/collections/categories/selectors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { Button, ConfirmDialog, TextField } from "@solid-client/components/ui";
 import { requireHavenSolidCore } from "@solid-client/core";
-import { useSession } from "@solid-client/contexts/SessionProvider";
 import { ChannelPermissionsDialog } from "./ChannelPermissionsDialog";
 
-type ChannelEditorTarget =
-  | { mode: "create"; kind: ChannelKind }
-  | { mode: "edit"; channel: HavenChannel };
+type Group = { category: ChannelCategory | null; channels: Channel[] };
 
-type GroupEditorTarget =
+type ChannelEditor =
+  | { mode: "create"; kind: "text" | "voice"; categoryId: string | null }
+  | { mode: "edit"; channel: Channel };
+
+type CategoryEditor =
   | { mode: "create" }
-  | { mode: "edit"; group: ChannelGroup };
+  | { mode: "edit"; category: ChannelCategory };
 
+type DeleteTarget =
+  | { kind: "channel"; channel: Channel }
+  | { kind: "category"; category: ChannelCategory };
+
+/**
+ * A community's channels and categories, for those with `manage_channels`.
+ * Every change goes to the database; its answer, and any other channel it
+ * touched, come back through the channels and categories collections.
+ */
 export function CommunityChannelsTab(props: { communityId: string }) {
   const core = requireHavenSolidCore();
-  const { session } = useSession();
-  const navigate = useNavigate();
-  const channels = core.channels.channels(() => props.communityId);
-  const groupState = core.channels.channelGroups(() => props.communityId);
-  const loading = core.channels.loading(() => props.communityId);
-  const permissions = createMemo(() =>
-    core.permissions.getPermissions(props.communityId),
-  );
-  const [editor, setEditor] = createSignal<ChannelEditorTarget | null>(null);
-  const [groupEditor, setGroupEditor] = createSignal<GroupEditorTarget | null>(
-    null,
-  );
-  const [groupDeleteTarget, setGroupDeleteTarget] =
-    createSignal<ChannelGroup | null>(null);
-  const [deleteTarget, setDeleteTarget] = createSignal<HavenChannel | null>(
+  const groups = createMemo<Group[]>(() => {
+    const channels = communityChannels(core.stores.channels, props.communityId);
+    const categories = categoriesOf(core.stores.categories, props.communityId);
+    const known = new Set(categories.map((c) => c.id));
+    return [
+      {
+        category: null,
+        channels: channels.filter(
+          (c) => c.category_id === null || !known.has(c.category_id),
+        ),
+      },
+      ...categories.map((category) => ({
+        category,
+        channels: channels.filter((c) => c.category_id === category.id),
+      })),
+    ];
+  });
+  const canSetPermissions = () =>
+    core.communities.can(props.communityId, "manage_channel_permissions");
+
+  const [editor, setEditor] = createSignal<ChannelEditor | null>(null);
+  const [categoryEditor, setCategoryEditor] =
+    createSignal<CategoryEditor | null>(null);
+  const [deleteTarget, setDeleteTarget] = createSignal<DeleteTarget | null>(
     null,
   );
   const [permissionsTarget, setPermissionsTarget] =
-    createSignal<HavenChannel | null>(null);
-  const [deleting, setDeleting] = createSignal(false);
-  const [groupDeleting, setGroupDeleting] = createSignal(false);
-  const [structurePending, setStructurePending] = createSignal<string | null>(
-    null,
-  );
+    createSignal<Channel | null>(null);
+  const [working, setWorking] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  const channelsById = createMemo(
-    () => new Map(channels().map((channel) => [channel.id, channel])),
-  );
 
-  // ensureLoaded reads state.byCommunity synchronously before its first await,
-  // so calling it bare leaks that read into this effect's deps and the load's
-  // own write retriggers it. Track communityId only. See haven-solid-reactivity.
-  createEffect(() => {
-    const communityId = props.communityId;
-    if (!communityId) return;
-    untrack(() => {
-      void core.channels.ensureLoaded(communityId).catch((cause) => {
-        setError(
-          cause instanceof Error ? cause.message : "Couldn't load channels.",
-        );
-      });
-    });
-  });
-
-  const navigateToChannel = (channelId: string) => {
-    navigate(`/community/${props.communityId}/channel/${channelId}`);
-  };
-
-  const deleteChannel = async () => {
-    const channel = deleteTarget();
-    if (!channel) return;
-    setDeleting(true);
+  const run = async (work: () => Promise<unknown>, failure: string) => {
+    setWorking(true);
     setError(null);
     try {
-      await core.channels.deleteChannel({
-        communityId: props.communityId,
-        channelId: channel.id,
-      });
-      setDeleteTarget(null);
-      const nextChannelId = core.channels.activeChannelId();
-      if (nextChannelId) navigateToChannel(nextChannelId);
+      await work();
+      return true;
     } catch (cause) {
-      setDeleteTarget(null);
-      setError(
-        cause instanceof Error ? cause.message : "Couldn't delete the channel.",
-      );
+      setError(getErrorMessage(cause, failure));
+      return false;
     } finally {
-      setDeleting(false);
+      setWorking(false);
     }
   };
 
-  const updateChannelGroup = async (channelId: string, groupId: string) => {
-    setStructurePending(channelId);
-    setError(null);
-    try {
-      if (groupId) {
-        await core.channels.assignChannelToGroup(
-          props.communityId,
-          channelId,
-          groupId,
-        );
-      } else {
-        await core.channels.removeChannelFromGroup(
-          props.communityId,
-          channelId,
-        );
+  /**
+   * Puts the group in this order: positions 0, 1, 2… Only channels whose
+   * position or category changes are sent.
+   */
+  const placeInOrder = (categoryId: string | null, ordered: Channel[]) =>
+    run(async () => {
+      for (const [position, channel] of ordered.entries()) {
+        if (
+          channel.position !== position ||
+          channel.category_id !== categoryId
+        ) {
+          await core.channels.move(channel.id, categoryId, position);
+        }
       }
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Couldn't move the channel.",
-      );
-    } finally {
-      setStructurePending(null);
-    }
+    }, "Couldn't move the channel.");
+
+  const shift = (group: Group, index: number, by: -1 | 1) => {
+    const ordered = [...group.channels];
+    const [moving] = ordered.splice(index, 1);
+    ordered.splice(index + by, 0, moving);
+    void placeInOrder(group.category?.id ?? null, ordered);
   };
 
-  const toggleGroup = async (group: ChannelGroup) => {
-    const collapsed = groupState().collapsedGroupIds.includes(group.id);
-    setStructurePending(group.id);
-    setError(null);
-    try {
-      await core.channels.setChannelGroupCollapsed(
-        props.communityId,
-        group.id,
-        !collapsed,
-      );
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Couldn't update the channel group.",
-      );
-    } finally {
-      setStructurePending(null);
-    }
+  const moveTo = (channel: Channel, categoryId: string | null) => {
+    const target = groups().find(
+      (g) => (g.category?.id ?? null) === categoryId,
+    );
+    void placeInOrder(categoryId, [
+      ...(target?.channels.filter((c) => c.id !== channel.id) ?? []),
+      channel,
+    ]);
   };
 
-  const deleteGroup = async () => {
-    const group = groupDeleteTarget();
-    if (!group) return;
-    setGroupDeleting(true);
-    setError(null);
-    try {
-      await core.channels.deleteChannelGroup(props.communityId, group.id);
-      setGroupDeleteTarget(null);
-    } catch (cause) {
-      setGroupDeleteTarget(null);
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Couldn't delete the channel group.",
-      );
-    } finally {
-      setGroupDeleting(false);
-    }
+  const confirmDelete = async () => {
+    const target = deleteTarget();
+    if (!target) return;
+    await run(
+      () =>
+        target.kind === "channel"
+          ? core.deleteChannel(target.channel.id)
+          : core.categories.remove(target.category.id),
+      "Couldn't delete it.",
+    );
+    setDeleteTarget(null);
   };
 
   return (
@@ -182,545 +140,417 @@ export function CommunityChannelsTab(props: { communityId: string }) {
             </p>
           </div>
           <div class="flex flex-wrap justify-end gap-2">
-            <Show when={permissions().canManageChannelStructure}>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => setGroupEditor({ mode: "create" })}
-              >
-                <FolderPlus size={15} />
-                Add group
-              </Button>
-            </Show>
-            <Show when={permissions().canCreateChannels}>
-              <Button
-                size="sm"
-                onClick={() => setEditor({ mode: "create", kind: "text" })}
-              >
-                <Plus size={15} />
-                Add channel
-              </Button>
-            </Show>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setCategoryEditor({ mode: "create" })}
+            >
+              <FolderPlus size={15} />
+              Add category
+            </Button>
+            <Button
+              size="sm"
+              onClick={() =>
+                setEditor({ mode: "create", kind: "text", categoryId: null })
+              }
+            >
+              <Plus size={15} />
+              Add channel
+            </Button>
           </div>
         </div>
 
         <Show when={error()}>
-          {(message) => (
-            <p class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {message()}
-            </p>
-          )}
-        </Show>
-
-        <Show
-          when={!loading()}
-          fallback={
-            <p class="rounded-lg border border-border bg-card px-4 py-8 text-center text-sm text-muted-foreground">
-              Loading channels…
-            </p>
-          }
-        >
-          <Show
-            when={channels().length > 0}
-            fallback={
-              <div class="rounded-lg border border-dashed border-border px-4 py-8 text-center">
-                <p class="text-sm font-medium text-foreground">
-                  No channels yet
-                </p>
-                <p class="mt-1 text-xs text-muted-foreground">
-                  Create a text or voice channel to get started.
-                </p>
-              </div>
-            }
-          >
-            <div class="space-y-3">
-              <For each={groupState().groups}>
-                {(group) => {
-                  const collapsed = () =>
-                    groupState().collapsedGroupIds.includes(group.id);
-                  return (
-                    <section class="overflow-hidden rounded-lg border border-border bg-card">
-                      <div class="flex items-center gap-2 border-b border-border px-3 py-2">
-                        <button
-                          type="button"
-                          title={
-                            collapsed() ? "Expand group" : "Collapse group"
-                          }
-                          disabled={structurePending() === group.id}
-                          onClick={() => void toggleGroup(group)}
-                          class="rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
-                        >
-                          <Show
-                            when={collapsed()}
-                            fallback={<ChevronDown size={15} />}
-                          >
-                            <ChevronRight size={15} />
-                          </Show>
-                        </button>
-                        <h4 class="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          {group.name}
-                        </h4>
-                        <span class="text-xs text-muted-foreground">
-                          {group.channelIds.length}
-                        </span>
-                        <Show when={permissions().canManageChannelStructure}>
-                          <button
-                            type="button"
-                            title={`Rename ${group.name}`}
-                            onClick={() =>
-                              setGroupEditor({ mode: "edit", group })
-                            }
-                            class="rounded p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            title={`Delete ${group.name}`}
-                            onClick={() => setGroupDeleteTarget(group)}
-                            class="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </Show>
-                      </div>
-                      <Show when={!collapsed()}>
-                        <div class="divide-y divide-border">
-                          <For
-                            each={group.channelIds
-                              .map((id) => channelsById().get(id))
-                              .filter(
-                                (channel): channel is HavenChannel => !!channel,
-                              )}
-                            fallback={
-                              <p class="px-4 py-4 text-xs text-muted-foreground">
-                                No channels in this group.
-                              </p>
-                            }
-                          >
-                            {(channel) => (
-                              <ChannelRow
-                                channel={channel}
-                                groupId={group.id}
-                                groups={groupState().groups}
-                                canManage={
-                                  permissions().canManageChannelStructure
-                                }
-                                canManagePermissions={
-                                  permissions().canManageChannelPermissions
-                                }
-                                pending={structurePending() === channel.id}
-                                onGroupChange={updateChannelGroup}
-                                onEdit={(target) =>
-                                  setEditor({ mode: "edit", channel: target })
-                                }
-                                onDelete={setDeleteTarget}
-                                onPermissions={setPermissionsTarget}
-                              />
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                    </section>
-                  );
-                }}
-              </For>
-
-              <Show when={groupState().ungroupedChannelIds.length > 0}>
-                <section class="overflow-hidden rounded-lg border border-border bg-card">
-                  <Show when={groupState().groups.length > 0}>
-                    <h4 class="border-b border-border px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Ungrouped
-                    </h4>
-                  </Show>
-                  <div class="divide-y divide-border">
-                    <For
-                      each={groupState()
-                        .ungroupedChannelIds.map((id) => channelsById().get(id))
-                        .filter(
-                          (channel): channel is HavenChannel => !!channel,
-                        )}
-                    >
-                      {(channel) => (
-                        <ChannelRow
-                          channel={channel}
-                          groupId=""
-                          groups={groupState().groups}
-                          canManage={permissions().canManageChannelStructure}
-                          canManagePermissions={
-                            permissions().canManageChannelPermissions
-                          }
-                          pending={structurePending() === channel.id}
-                          onGroupChange={updateChannelGroup}
-                          onEdit={(target) =>
-                            setEditor({ mode: "edit", channel: target })
-                          }
-                          onDelete={setDeleteTarget}
-                          onPermissions={setPermissionsTarget}
-                        />
-                      )}
-                    </For>
-                  </div>
-                </section>
-              </Show>
-            </div>
-          </Show>
-        </Show>
-      </div>
-
-      <ChannelEditorDialog
-        communityId={props.communityId}
-        target={editor()}
-        onClose={() => setEditor(null)}
-        onCreated={navigateToChannel}
-      />
-      <ChannelGroupEditorDialog
-        communityId={props.communityId}
-        userId={session()?.user.id ?? null}
-        target={groupEditor()}
-        onClose={() => setGroupEditor(null)}
-      />
-      <ChannelPermissionsDialog
-        communityId={props.communityId}
-        channel={permissionsTarget()}
-        onClose={() => setPermissionsTarget(null)}
-      />
-      <ConfirmDialog
-        open={deleteTarget() !== null}
-        title={`Delete #${deleteTarget()?.name ?? "channel"}?`}
-        description="Messages in this channel will no longer be available. This can't be undone."
-        confirmLabel="Delete channel"
-        danger
-        pending={deleting()}
-        onConfirm={() => void deleteChannel()}
-        onCancel={() => setDeleteTarget(null)}
-      />
-      <ConfirmDialog
-        open={groupDeleteTarget() !== null}
-        title={`Delete ${groupDeleteTarget()?.name ?? "group"}?`}
-        description="Channels in this group will become ungrouped. The channels and their messages will stay available."
-        confirmLabel="Delete group"
-        danger
-        pending={groupDeleting()}
-        onConfirm={() => void deleteGroup()}
-        onCancel={() => setGroupDeleteTarget(null)}
-      />
-    </div>
-  );
-}
-
-function ChannelRow(props: {
-  channel: HavenChannel;
-  groupId: string;
-  groups: ChannelGroup[];
-  canManage: boolean;
-  canManagePermissions: boolean;
-  pending: boolean;
-  onGroupChange: (channelId: string, groupId: string) => Promise<void>;
-  onEdit: (channel: HavenChannel) => void;
-  onDelete: (channel: HavenChannel) => void;
-  onPermissions: (channel: HavenChannel) => void;
-}) {
-  return (
-    <div class="flex items-center gap-3 px-4 py-3">
-      <span class="text-muted-foreground">
-        {props.channel.kind === "voice" ? "♪" : "#"}
-      </span>
-      <div class="min-w-0 flex-1">
-        <p class="truncate text-sm font-medium text-foreground">
-          {props.channel.name}
-        </p>
-        <Show when={props.channel.topic}>
-          <p class="truncate text-xs text-muted-foreground">
-            {props.channel.topic}
+          <p class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error()}
           </p>
         </Show>
+
+        <For each={groups()}>
+          {(group) => (
+            <section class="rounded-xl border border-border bg-card">
+              <header class="flex items-center gap-2 border-b border-border px-4 py-2">
+                <span class="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {group.category?.name ?? "Not in a category"}
+                </span>
+                <Show when={group.category}>
+                  {(category) => (
+                    <>
+                      <IconButton
+                        title="Rename category"
+                        onClick={() =>
+                          setCategoryEditor({
+                            mode: "edit",
+                            category: category(),
+                          })
+                        }
+                      >
+                        <Pencil size={14} />
+                      </IconButton>
+                      <IconButton
+                        title="Delete category"
+                        danger
+                        onClick={() =>
+                          setDeleteTarget({
+                            kind: "category",
+                            category: category(),
+                          })
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </>
+                  )}
+                </Show>
+              </header>
+              <Show
+                when={group.channels.length > 0}
+                fallback={
+                  <p class="px-4 py-3 text-sm text-muted-foreground">
+                    No channels here.
+                  </p>
+                }
+              >
+                <For each={group.channels}>
+                  {(channel, index) => (
+                    <div class="flex items-center gap-2 border-b border-border px-4 py-2 last:border-b-0">
+                      <span class="w-4 text-muted-foreground">
+                        {channel.kind === "voice" ? "♪" : "#"}
+                      </span>
+                      <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm text-foreground">
+                          {channel.name}
+                        </p>
+                        <Show when={channel.topic}>
+                          <p class="truncate text-xs text-muted-foreground">
+                            {channel.topic}
+                          </p>
+                        </Show>
+                      </div>
+                      <select
+                        aria-label="Category"
+                        value={channel.category_id ?? ""}
+                        disabled={working()}
+                        onChange={(e) =>
+                          moveTo(channel, e.currentTarget.value || null)
+                        }
+                        class="rounded border border-border-control bg-surface-input px-2 py-1 text-xs text-foreground"
+                      >
+                        <option value="">No category</option>
+                        <For each={groups().filter((g) => g.category)}>
+                          {(g) => (
+                            <option value={g.category!.id}>
+                              {g.category!.name}
+                            </option>
+                          )}
+                        </For>
+                      </select>
+                      <IconButton
+                        title="Move up"
+                        disabled={working() || index() === 0}
+                        onClick={() => shift(group, index(), -1)}
+                      >
+                        <ArrowUp size={14} />
+                      </IconButton>
+                      <IconButton
+                        title="Move down"
+                        disabled={
+                          working() || index() === group.channels.length - 1
+                        }
+                        onClick={() => shift(group, index(), 1)}
+                      >
+                        <ArrowDown size={14} />
+                      </IconButton>
+                      <IconButton
+                        title="Edit channel"
+                        onClick={() => setEditor({ mode: "edit", channel })}
+                      >
+                        <Pencil size={14} />
+                      </IconButton>
+                      <Show when={canSetPermissions()}>
+                        <IconButton
+                          title="Channel permissions"
+                          onClick={() => setPermissionsTarget(channel)}
+                        >
+                          <ShieldCheck size={14} />
+                        </IconButton>
+                      </Show>
+                      <IconButton
+                        title="Delete channel"
+                        danger
+                        onClick={() =>
+                          setDeleteTarget({ kind: "channel", channel })
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </IconButton>
+                    </div>
+                  )}
+                </For>
+              </Show>
+            </section>
+          )}
+        </For>
       </div>
-      <Show when={props.canManage}>
-        <select
-          aria-label={`Group for ${props.channel.name}`}
-          value={props.groupId}
-          disabled={props.pending}
-          onChange={(event) =>
-            void props.onGroupChange(
-              props.channel.id,
-              event.currentTarget.value,
-            )
-          }
-          class="max-w-36 rounded border border-input bg-surface-input px-2 py-1 text-xs text-foreground disabled:opacity-50"
-        >
-          <option value="">Ungrouped</option>
-          <For each={props.groups}>
-            {(group) => <option value={group.id}>{group.name}</option>}
-          </For>
-        </select>
-        <button
-          type="button"
-          title={`Edit ${props.channel.name}`}
-          onClick={() => props.onEdit(props.channel)}
-          class="rounded p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-        >
-          <Pencil size={15} />
-        </button>
-        <button
-          type="button"
-          title={`Delete ${props.channel.name}`}
-          onClick={() => props.onDelete(props.channel)}
-          class="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-        >
-          <Trash2 size={15} />
-        </button>
+
+      <Show when={editor()} keyed>
+        {(open) => (
+          <ChannelEditorDialog
+            communityId={props.communityId}
+            editor={open}
+            categories={groups().flatMap((g) =>
+              g.category ? [g.category] : [],
+            )}
+            onClose={() => setEditor(null)}
+          />
+        )}
       </Show>
-      <Show when={props.canManagePermissions}>
-        <button
-          type="button"
-          title={`Permissions for ${props.channel.name}`}
-          onClick={() => props.onPermissions(props.channel)}
-          class="rounded p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-        >
-          <ShieldCheck size={15} />
-        </button>
+      <Show when={categoryEditor()} keyed>
+        {(open) => (
+          <CategoryEditorDialog
+            communityId={props.communityId}
+            editor={open}
+            onClose={() => setCategoryEditor(null)}
+          />
+        )}
       </Show>
+      <Show when={permissionsTarget()} keyed>
+        {(channel) => (
+          <ChannelPermissionsDialog
+            communityId={props.communityId}
+            channel={channel}
+            onClose={() => setPermissionsTarget(null)}
+          />
+        )}
+      </Show>
+      <ConfirmDialog
+        open={deleteTarget() !== null}
+        title={
+          deleteTarget()?.kind === "category"
+            ? "Delete this category?"
+            : "Delete this channel?"
+        }
+        description={
+          deleteTarget()?.kind === "category"
+            ? "Its channels stay, outside any category."
+            : "Its messages are deleted for everyone. This can't be undone."
+        }
+        confirmLabel="Delete"
+        danger
+        pending={working()}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
 
-function ChannelGroupEditorDialog(props: {
-  communityId: string;
-  userId: string | null;
-  target: GroupEditorTarget | null;
-  onClose: () => void;
+function IconButton(props: {
+  title: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  children: import("solid-js").JSX.Element;
 }) {
   return (
-    <Show when={props.target} keyed>
-      {(target) => <ChannelGroupEditorBody {...props} target={target} />}
-    </Show>
+    <button
+      type="button"
+      title={props.title}
+      aria-label={props.title}
+      disabled={props.disabled}
+      onClick={() => props.onClick()}
+      class="rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground disabled:opacity-40"
+      classList={{ "hover:text-destructive": props.danger }}
+    >
+      {props.children}
+    </button>
   );
 }
 
-function ChannelGroupEditorBody(props: {
-  communityId: string;
-  userId: string | null;
-  target: GroupEditorTarget;
+function Dialog(props: {
+  title: string;
   onClose: () => void;
+  children: import("solid-js").JSX.Element;
 }) {
-  const core = requireHavenSolidCore();
-  const editing = () => props.target.mode === "edit";
-  const [name, setName] = createSignal(
-    props.target.mode === "edit" ? props.target.group.name : "",
-  );
-  const [pending, setPending] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-
-  const save = async () => {
-    const groupName = name().trim();
-    if (!groupName) {
-      setError("Enter a group name.");
-      return;
-    }
-    if (props.target.mode === "create" && !props.userId) {
-      setError("Your session is still loading. Try again in a moment.");
-      return;
-    }
-    setPending(true);
-    setError(null);
-    try {
-      if (props.target.mode === "create") {
-        await core.channels.createChannelGroup(
-          props.communityId,
-          groupName,
-          props.userId!,
-        );
-      } else {
-        await core.channels.renameChannelGroup(
-          props.communityId,
-          props.target.group.id,
-          groupName,
-        );
-      }
-      props.onClose();
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Couldn't save the channel group.",
-      );
-    } finally {
-      setPending(false);
-    }
-  };
-
   return (
     <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
-      onClick={() => !pending() && props.onClose()}
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+      onClick={() => props.onClose()}
     >
-      <div
+      <section
         role="dialog"
         aria-modal="true"
-        aria-label={editing() ? "Rename channel group" : "Create channel group"}
-        class="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl"
-        onClick={(event) => event.stopPropagation()}
+        aria-label={props.title}
+        class="w-full max-w-md rounded-lg border border-border-dialog bg-card p-4 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
       >
-        <h2 class="text-base font-semibold text-foreground">
-          {editing() ? "Rename channel group" : "Create a channel group"}
-        </h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Groups keep related channels together in the sidebar.
-        </p>
-        <div class="mt-4">
-          <TextField
-            value={name()}
-            onChange={setName}
-            label="Group name"
-            placeholder="Projects"
-            error={error()}
-            disabled={pending()}
-            required
-          />
-        </div>
-        <div class="mt-5 flex justify-end gap-2">
-          <Button variant="ghost" disabled={pending()} onClick={props.onClose}>
-            Cancel
-          </Button>
-          <Button disabled={pending()} onClick={() => void save()}>
-            {pending() ? "Saving…" : editing() ? "Rename" : "Create group"}
-          </Button>
-        </div>
-      </div>
+        <h2 class="text-base font-semibold text-foreground">{props.title}</h2>
+        {props.children}
+      </section>
     </div>
   );
 }
 
 function ChannelEditorDialog(props: {
   communityId: string;
-  target: ChannelEditorTarget | null;
+  editor: ChannelEditor;
+  categories: ChannelCategory[];
   onClose: () => void;
-  onCreated: (channelId: string) => void;
-}) {
-  return (
-    <Show when={props.target} keyed>
-      {(target) => <ChannelEditorBody {...props} target={target} />}
-    </Show>
-  );
-}
-
-function ChannelEditorBody(props: {
-  communityId: string;
-  target: ChannelEditorTarget;
-  onClose: () => void;
-  onCreated: (channelId: string) => void;
 }) {
   const core = requireHavenSolidCore();
-  const editing = () => props.target.mode === "edit";
-  const [name, setName] = createSignal(
-    props.target.mode === "edit" ? props.target.channel.name : "",
+  const editing = props.editor.mode === "edit" ? props.editor.channel : null;
+  const [kind, setKind] = createSignal<"text" | "voice">(
+    props.editor.mode === "create" ? props.editor.kind : "text",
   );
-  const [topic, setTopic] = createSignal(
-    props.target.mode === "edit" ? (props.target.channel.topic ?? "") : "",
+  const [name, setName] = createSignal(editing?.name ?? "");
+  const [topic, setTopic] = createSignal(editing?.topic ?? "");
+  const [categoryId, setCategoryId] = createSignal(
+    props.editor.mode === "create" ? (props.editor.categoryId ?? "") : "",
   );
-  const [kind, setKind] = createSignal<ChannelKind>(
-    props.target.mode === "edit"
-      ? props.target.channel.kind
-      : props.target.kind,
-  );
-  const [pending, setPending] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
   const save = async () => {
-    const channelName = name().trim();
-    if (!channelName) {
-      setError("Enter a channel name.");
+    if (!name().trim()) {
+      setError("A channel needs a name.");
       return;
     }
-    setPending(true);
+    setSaving(true);
     setError(null);
     try {
-      if (props.target.mode === "create") {
-        const created = await core.channels.createChannel({
-          communityId: props.communityId,
-          name: channelName,
-          topic: topic().trim() || null,
-          kind: kind(),
+      if (editing) {
+        await core.channels.update(editing.id, {
+          name: name().trim(),
+          topic: topic().trim(),
         });
-        props.onClose();
-        props.onCreated(created.id);
       } else {
-        await core.channels.updateChannel({
-          communityId: props.communityId,
-          channelId: props.target.channel.id,
-          name: channelName,
-          topic: topic().trim() || null,
+        await core.channels.create(props.communityId, kind(), name().trim(), {
+          topic: topic().trim() || undefined,
+          category_id: categoryId() || undefined,
         });
-        props.onClose();
       }
+      props.onClose();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Couldn't save the channel.",
-      );
+      setError(getErrorMessage(cause, "Couldn't save the channel."));
     } finally {
-      setPending(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
-      onClick={() => !pending() && props.onClose()}
+    <Dialog
+      title={editing ? `Edit #${editing.name}` : "New channel"}
+      onClose={props.onClose}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={editing() ? "Edit channel" : "Create channel"}
-        class="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 class="text-base font-semibold text-foreground">
-          {editing() ? "Edit channel" : "Create a channel"}
-        </h2>
-        <div class="mt-4 space-y-4">
-          <TextField
-            value={name()}
-            onChange={setName}
-            label="Channel name"
-            placeholder="announcements"
-            error={error()}
-            disabled={pending()}
-            required
-          />
-          <TextField
-            value={topic()}
-            onChange={setTopic}
-            label="Topic (optional)"
-            placeholder="What belongs in this channel?"
-            disabled={pending()}
-          />
-          <Show when={!editing()}>
-            <label class="flex flex-col gap-1 text-sm font-medium text-form-label">
-              Channel type
-              <select
-                value={kind()}
-                onChange={(event) =>
-                  setKind(event.currentTarget.value as ChannelKind)
-                }
-                disabled={pending()}
-                class="rounded-lg border border-input bg-surface-input px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden disabled:opacity-50"
-              >
-                <option value="text">Text</option>
-                <option value="voice">Voice</option>
-              </select>
-            </label>
-          </Show>
-        </div>
-        <div class="mt-5 flex justify-end gap-2">
-          <Button variant="ghost" disabled={pending()} onClick={props.onClose}>
+      <div class="mt-3 space-y-3">
+        <Show when={!editing}>
+          <div class="flex gap-2">
+            <For each={["text", "voice"] as const}>
+              {(option) => (
+                <button
+                  type="button"
+                  class="flex-1 rounded border px-3 py-2 text-sm"
+                  classList={{
+                    "border-primary bg-surface-panel text-foreground":
+                      kind() === option,
+                    "border-border-control text-body-soft": kind() !== option,
+                  }}
+                  onClick={() => setKind(option)}
+                >
+                  {option === "text" ? "# Text" : "♪ Voice"}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <TextField value={name()} onChange={setName} label="Name" required />
+        <TextField value={topic()} onChange={setTopic} label="Topic" />
+        <Show when={!editing && props.categories.length > 0}>
+          <label class="flex flex-col gap-1 text-sm font-medium text-form-label">
+            Category
+            <select
+              value={categoryId()}
+              onChange={(e) => setCategoryId(e.currentTarget.value)}
+              class="rounded border border-border-control bg-surface-input px-2 py-2 text-sm text-foreground"
+            >
+              <option value="">No category</option>
+              <For each={props.categories}>
+                {(category) => (
+                  <option value={category.id}>{category.name}</option>
+                )}
+              </For>
+            </select>
+          </label>
+        </Show>
+        <Show when={error()}>
+          <p class="text-sm text-destructive">{error()}</p>
+        </Show>
+        <div class="flex justify-end gap-2">
+          <Button variant="ghost" disabled={saving()} onClick={props.onClose}>
             Cancel
           </Button>
-          <Button disabled={pending()} onClick={() => void save()}>
-            {pending() ? "Saving…" : editing() ? "Save changes" : "Create"}
+          <Button disabled={saving()} onClick={() => void save()}>
+            {saving() ? "Saving…" : "Save"}
           </Button>
         </div>
       </div>
-    </div>
+    </Dialog>
+  );
+}
+
+function CategoryEditorDialog(props: {
+  communityId: string;
+  editor: CategoryEditor;
+  onClose: () => void;
+}) {
+  const core = requireHavenSolidCore();
+  const editing = props.editor.mode === "edit" ? props.editor.category : null;
+  const [name, setName] = createSignal(editing?.name ?? "");
+  const [saving, setSaving] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
+
+  const save = async () => {
+    if (!name().trim()) {
+      setError("A category needs a name.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await core.categories.save(
+        props.communityId,
+        name().trim(),
+        editing
+          ? { category_id: editing.id, position: editing.position }
+          : undefined,
+      );
+      props.onClose();
+    } catch (cause) {
+      setError(getErrorMessage(cause, "Couldn't save the category."));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog
+      title={editing ? "Rename category" : "New category"}
+      onClose={props.onClose}
+    >
+      <div class="mt-3 space-y-3">
+        <TextField value={name()} onChange={setName} label="Name" required />
+        <Show when={error()}>
+          <p class="text-sm text-destructive">{error()}</p>
+        </Show>
+        <div class="flex justify-end gap-2">
+          <Button variant="ghost" disabled={saving()} onClick={props.onClose}>
+            Cancel
+          </Button>
+          <Button disabled={saving()} onClick={() => void save()}>
+            {saving() ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
   );
 }

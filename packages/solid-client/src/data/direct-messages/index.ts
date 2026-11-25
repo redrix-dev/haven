@@ -1,1 +1,0 @@
-export { DirectMessageSolidNexus } from "./directMessageSolidNexus";

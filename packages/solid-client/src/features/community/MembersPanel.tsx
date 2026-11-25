@@ -1,107 +1,95 @@
-import { For, Show, createEffect, createSignal, untrack } from "solid-js";
-import { Ban, Crown, Flag, Undo2, UserMinus, X } from "lucide-solid";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  untrack,
+} from "solid-js";
+import { Ban, Crown, Flag, Undo2, UserMinus } from "lucide-solid";
 import { requireHavenSolidCore } from "@solid-client/core";
+import { usePeople } from "@solid-client/contexts/PeopleProvider";
 import {
   ActionsMenu,
   Avatar,
   ConfirmDialog,
-  ProfileCard,
-  ReportDialog,
   type ActionMenuItem,
-  type ReportDialogResult,
 } from "@solid-client/components/ui";
-import type { CommunityMemberListItem } from "@shared/lib/backend/types";
+import { bansOf, membersOf } from "@shared/collections/members/selectors";
+import { memberColor, outranks } from "@shared/collections/roles/selectors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { useToast } from "@solid-client/contexts/ToastProvider";
 
 type PendingAction =
-  | { kind: "kick"; member: CommunityMemberListItem }
-  | { kind: "ban"; member: CommunityMemberListItem }
+  | { kind: "kick"; userId: string; name: string }
+  | { kind: "ban"; userId: string; name: string }
   | { kind: "unban"; userId: string; name: string };
 
+/**
+ * A community's members, and its ban list for those who manage bans. Kick and
+ * ban are offered only on members ranked below the person; the database
+ * decides each one again.
+ */
 export function MembersPanel(props: { communityId: string }) {
   const core = requireHavenSolidCore();
-  const members = core.admin.members(() => props.communityId);
-  const loading = core.admin.membersLoading(() => props.communityId);
-  const bans = core.admin.bans(() => props.communityId);
+  const people = usePeople();
+  const toast = useToast();
+  const community = () => core.stores.communities.byId[props.communityId];
+  const me = () => core.userId ?? "";
 
-  const myUserId = core.authStore.getState().user?.id ?? null;
-  const canManageMembers = () =>
-    core.permissions.getPermissions(props.communityId).canManageMembers;
-  const canManageBans = () =>
-    core.permissions.getPermissions(props.communityId).canManageBans;
-  const canReport = () =>
-    core.permissions.getPermissions(props.communityId).canCreateReports;
+  const members = createMemo(() =>
+    membersOf(core.stores.members, props.communityId)
+      .map((member) => ({
+        userId: member.user_id,
+        name: core.nameOf(member.user_id, props.communityId),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  const bans = createMemo(() => bansOf(core.stores.members, props.communityId));
+  const can = (permission: Parameters<typeof core.communities.can>[1]) =>
+    core.communities.can(props.communityId, permission);
 
   const [view, setView] = createSignal<"members" | "bans">("members");
   const [pending, setPending] = createSignal<PendingAction | null>(null);
   const [working, setWorking] = createSignal(false);
-  const [reportTarget, setReportTarget] = createSignal<{
-    userId: string;
-    name: string;
-  } | null>(null);
-  const [profileTarget, setProfileTarget] =
-    createSignal<CommunityMemberListItem | null>(null);
-  const profileTargetId = () => profileTarget()?.userId ?? null;
-  const profileCard = core.profiles.profileCard(profileTargetId);
-  const profileLoading = core.profiles.profileCardLoading(profileTargetId);
-  const profileError = core.profiles.profileCardError(profileTargetId);
-  const profileStaff = core.profiles.platformStaffInfo(profileTargetId);
 
-  const memberActions = (member: CommunityMemberListItem): ActionMenuItem[] => {
-    if (!canReport() || member.userId === myUserId) return [];
-    return [
-      {
-        label: `Report ${member.displayName}`,
-        icon: Flag,
-        danger: true,
-        onSelect: () =>
-          setReportTarget({ userId: member.userId, name: member.displayName }),
-      },
-    ];
-  };
-
-  const submitReport = async (result: ReportDialogResult) => {
-    const target = reportTarget();
-    if (!target || !myUserId) return;
-    await core.reportUserProfile({
-      communityId: props.communityId,
-      targetUserId: target.userId,
-      reporterUserId: myUserId,
-      reason: result.comment,
-      target: result.target,
-    });
-    setReportTarget(null);
-  };
-
-  // Each effect tracks its ids only; the loads read the stores they write.
-  // See haven-solid-reactivity and communitySurfaces.tier2.test.ts.
-  createEffect(() => {
-    const communityId = props.communityId;
-    untrack(() => {
-      void core.ensureCommunityPermissions(communityId);
-      void core.admin.ensureMembersLoaded(communityId);
-    });
-  });
+  // Track the tab and the community; loading reads the store it writes.
   createEffect(() => {
     const communityId = props.communityId;
     if (view() !== "bans") return;
-    untrack(() => void core.admin.loadBans(communityId));
+    untrack(() => void core.members.loadBans(communityId).catch(() => {}));
   });
   createEffect(() => {
-    const target = profileTarget();
-    if (!target) return;
-    const userId = target.userId;
-    untrack(() => {
-      void Promise.all([
-        core.profiles.loadProfileCard(userId),
-        core.profiles.ensurePlatformStaff(userId),
-      ]).catch(() => {
-        // The profile nexus exposes loading/error state in the dialog.
-      });
-    });
+    const ids = bans().map((ban) => ban.user_id);
+    untrack(() => void core.profiles.ensure(ids));
   });
 
-  const canModerate = (member: CommunityMemberListItem) =>
-    canManageMembers() && !member.isOwner && member.userId !== myUserId;
+  const canModerate = (userId: string) => {
+    const shown = community();
+    return (
+      !!shown &&
+      can("manage_members") &&
+      outranks(core.stores.roles, shown, me(), userId)
+    );
+  };
+
+  const memberActions = (userId: string, name: string): ActionMenuItem[] =>
+    userId === me()
+      ? []
+      : [
+          {
+            label: `Report ${name}`,
+            icon: Flag,
+            danger: true,
+            onSelect: () =>
+              people.report({
+                subject: "person",
+                userId,
+                communityId: props.communityId,
+                name,
+              }),
+          },
+        ];
 
   const runAction = async (reason: string) => {
     const action = pending();
@@ -109,25 +97,18 @@ export function MembersPanel(props: { communityId: string }) {
     setWorking(true);
     try {
       if (action.kind === "kick") {
-        await core.admin.kickMember({
-          communityId: props.communityId,
-          targetUserId: action.member.userId,
-        });
+        await core.members.kick(props.communityId, action.userId);
       } else if (action.kind === "ban") {
-        await core.admin.banMember({
-          communityId: props.communityId,
-          targetUserId: action.member.userId,
-          reason,
-        });
+        await core.members.ban(props.communityId, action.userId, reason);
       } else {
-        await core.admin.unbanMember({
-          communityId: props.communityId,
-          targetUserId: action.userId,
-        });
+        await core.members.unban(props.communityId, action.userId);
       }
       setPending(null);
-    } catch {
-      // The cache logged it; leave the dialog open so the user can retry.
+    } catch (error) {
+      toast.show({
+        title: "That didn't work",
+        body: getErrorMessage(error, "Try again in a moment."),
+      });
     } finally {
       setWorking(false);
     }
@@ -142,7 +123,7 @@ export function MembersPanel(props: { communityId: string }) {
           active={view() === "members"}
           onClick={() => setView("members")}
         />
-        <Show when={canManageBans()}>
+        <Show when={can("manage_bans")}>
           <Tab
             label="Bans"
             count={bans().length}
@@ -154,61 +135,68 @@ export function MembersPanel(props: { communityId: string }) {
 
       <div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <Show when={view() === "members"}>
-          <Show
-            when={!loading() || members().length > 0}
-            fallback={
-              <p class="px-1 text-sm text-muted-foreground">Loading…</p>
-            }
-          >
-            <For each={members()}>
-              {(member) => (
-                <ActionsMenu
-                  items={memberActions(member)}
-                  label="Member actions"
-                  hoverButton={false}
-                >
-                  <div class="group flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-list-hover">
-                    <button
-                      type="button"
-                      onClick={() => setProfileTarget(member)}
-                      class="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <For each={members()}>
+            {(member) => (
+              <ActionsMenu
+                items={memberActions(member.userId, member.name)}
+                label="Member actions"
+                hoverButton={false}
+              >
+                <div class="group flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-list-hover">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      people.openProfile(member.userId, props.communityId)
+                    }
+                    class="flex min-w-0 flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <Avatar
+                      src={core.avatarUrl(member.userId)}
+                      name={member.name}
+                    />
+                    <span
+                      class="min-w-0 flex-1 truncate text-sm text-body-soft"
+                      style={(() => {
+                        const color = memberColor(
+                          core.stores.roles,
+                          props.communityId,
+                          member.userId,
+                        );
+                        return color ? { color } : undefined;
+                      })()}
                     >
-                      <Avatar
-                        src={member.avatarUrl}
-                        name={member.displayName}
-                      />
-                      <span class="min-w-0 flex-1 truncate text-sm text-body-soft">
-                        {member.displayName}
-                      </span>
-                      <Show when={member.isOwner}>
-                        <Crown size={14} class="shrink-0 text-accent-amber" />
-                      </Show>
-                    </button>
-                    <Show when={canModerate(member)}>
-                      <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
-                        <button
-                          type="button"
-                          title="Kick"
-                          onClick={() => setPending({ kind: "kick", member })}
-                          class="rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
-                        >
-                          <UserMinus size={14} />
-                        </button>
+                      {member.name}
+                    </span>
+                    <Show when={community()?.owner_id === member.userId}>
+                      <Crown size={14} class="shrink-0 text-accent-amber" />
+                    </Show>
+                  </button>
+                  <Show when={canModerate(member.userId)}>
+                    <div class="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+                      <button
+                        type="button"
+                        title="Kick"
+                        onClick={() => setPending({ kind: "kick", ...member })}
+                        class="rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                      >
+                        <UserMinus size={14} />
+                      </button>
+                      <Show when={can("manage_bans")}>
                         <button
                           type="button"
                           title="Ban"
-                          onClick={() => setPending({ kind: "ban", member })}
+                          onClick={() => setPending({ kind: "ban", ...member })}
                           class="rounded p-1 text-muted-foreground hover:bg-destructive hover:text-primary-foreground"
                         >
                           <Ban size={14} />
                         </button>
-                      </div>
-                    </Show>
-                  </div>
-                </ActionsMenu>
-              )}
-            </For>
-          </Show>
+                      </Show>
+                    </div>
+                  </Show>
+                </div>
+              </ActionsMenu>
+            )}
+          </For>
         </Show>
 
         <Show when={view() === "bans"}>
@@ -223,16 +211,17 @@ export function MembersPanel(props: { communityId: string }) {
             <For each={bans()}>
               {(ban) => (
                 <div class="group flex items-center gap-2 rounded px-1 py-1 hover:bg-surface-list-hover">
-                  <Avatar src={ban.avatarUrl} name={ban.username} />
+                  <Avatar
+                    src={core.avatarUrl(ban.user_id)}
+                    name={core.nameOf(ban.user_id)}
+                  />
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-sm text-body-soft">
-                      {ban.username}
+                      {core.nameOf(ban.user_id)}
                     </p>
-                    <Show when={ban.reason}>
-                      <p class="truncate text-xs text-muted-foreground">
-                        {ban.reason}
-                      </p>
-                    </Show>
+                    <p class="truncate text-xs text-muted-foreground">
+                      {ban.reason}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -240,8 +229,8 @@ export function MembersPanel(props: { communityId: string }) {
                     onClick={() =>
                       setPending({
                         kind: "unban",
-                        userId: ban.bannedUserId,
-                        name: ban.username,
+                        userId: ban.user_id,
+                        name: core.nameOf(ban.user_id),
                       })
                     }
                     class="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-surface-hover hover:text-foreground group-hover:opacity-100"
@@ -274,57 +263,6 @@ export function MembersPanel(props: { communityId: string }) {
         onConfirm={(reason) => void runAction(reason)}
         onCancel={() => setPending(null)}
       />
-
-      <ReportDialog
-        open={reportTarget() !== null}
-        title={`Report ${reportTarget()?.name ?? "user"}`}
-        subjectLabel="Reported user"
-        subjectPreview={reportTarget()?.name}
-        showKind={false}
-        showTarget
-        onClose={() => setReportTarget(null)}
-        onSubmit={submitReport}
-      />
-
-      <Show when={profileTarget()}>
-        {(target) => (
-          <div
-            class="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
-            onClick={() => setProfileTarget(null)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={`${target().displayName} profile`}
-              class="w-full max-w-sm"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div class="mb-2 flex justify-end">
-                <button
-                  type="button"
-                  title="Close profile"
-                  onClick={() => setProfileTarget(null)}
-                  class="rounded-full bg-card p-2 text-muted-foreground shadow hover:text-foreground"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <Show
-                when={profileCard()}
-                fallback={
-                  <div class="rounded-xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-                    {profileLoading()
-                      ? "Loading profile…"
-                      : profileError() || "This profile isn't available."}
-                  </div>
-                }
-              >
-                {(card) => <ProfileCard card={card()} staff={profileStaff()} />}
-              </Show>
-            </div>
-          </div>
-        )}
-      </Show>
     </aside>
   );
 }
@@ -353,8 +291,8 @@ function Tab(props: {
 
 function dialogTitle(action: PendingAction | null): string {
   if (!action) return "";
-  if (action.kind === "kick") return `Kick ${action.member.displayName}?`;
-  if (action.kind === "ban") return `Ban ${action.member.displayName}?`;
+  if (action.kind === "kick") return `Kick ${action.name}?`;
+  if (action.kind === "ban") return `Ban ${action.name}?`;
   return `Unban ${action.name}?`;
 }
 
@@ -362,7 +300,7 @@ function dialogDescription(action: PendingAction | null): string | undefined {
   if (!action) return undefined;
   if (action.kind === "kick") return "They can rejoin later with an invite.";
   if (action.kind === "ban")
-    return "They'll be removed and blocked from rejoining.";
+    return "They'll be removed and blocked from rejoining. Their messages are hidden from members while the ban lasts.";
   return "They'll be able to rejoin with an invite.";
 }
 

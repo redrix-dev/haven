@@ -1,6 +1,6 @@
 # Haven Mobile (Expo + dev client + UniWind)
 
-Native UI lives here. Shared **business** logic targets `packages/shared`; read [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) for the three-layer law, then [`docs/architecture/HAVEN_CORE.md`](../../docs/architecture/HAVEN_CORE.md) for the mobile data-layer contract.
+Native UI lives here. Shared **business** logic targets `packages/shared`; read [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) for the three-layer law, then [`docs/architecture/COLLECTIONS.md`](../../docs/architecture/COLLECTIONS.md) for the data layer (mobile runs it as `HavenReactCore`, `src/data/core/`).
 
 ## Prerequisites (macOS for iOS)
 

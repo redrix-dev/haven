@@ -89,19 +89,6 @@ export type VoiceRuntimeBridge = {
   addDeviceChangeListener: (listener: () => void) => () => void;
 };
 
-/**
- * Imperative shell navigation requested from non-UI code (notification taps,
- * deep links, access-revoked redirects). The shell implementation owns the
- * actual navigation primitive (React Navigation ref, history.pushState, etc).
- *
- * UI components should NOT call these directly during normal interaction —
- * they exist for external events that cannot reach the router by themselves.
- */
-export type ShellNavigationBridge = {
-  navigateToCommunity?: (serverId: string, channelId?: string | null) => void;
-  navigateToDm?: (conversationId: string) => void;
-};
-
 export type AppHost = {
   isDesktopApp: () => boolean;
   openExternalUrl: (url: string) => Promise<void>;
@@ -109,8 +96,6 @@ export type AppHost = {
     url: string;
     suggestedName: string;
   }) => Promise<SaveFileFromUrlResult>;
-  navigateToCommunity?: ShellNavigationBridge["navigateToCommunity"];
-  navigateToDm?: ShellNavigationBridge["navigateToDm"];
   desktopSettings?: DesktopSettingsBridge;
   desktopAuth?: DesktopAuthBridge;
   voicePopout?: VoicePopoutBridge;

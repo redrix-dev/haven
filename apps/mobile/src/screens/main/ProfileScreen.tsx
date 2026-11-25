@@ -1,16 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHavenCore } from "@mobile-data";
-import { useProfilesRecord, useViewerProfile } from "@mobile-data/hooks";
-import {
-  resolveLiveAvatarUrl,
-  resolveLiveUsername,
-} from "@shared/lib/liveProfiles";
-import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { useAvatarUrl, useHavenCore, useMe, useStore } from "@mobile-data";
 import UserAccountCard from "@/features/user-profile/UserAccountCard";
 import { ProfileDetailsSettingsCard } from "@/features/user-profile/ProfileDetailsSettingsCard";
 import { loadPickedAvatarForUpload } from "@/features/user-profile/loadPickedAvatarForUpload";
@@ -22,40 +16,25 @@ import type { MainStackParamList } from "@/navigation/types";
 
 type Props = NativeStackScreenProps<MainStackParamList, "Profile">;
 
+/** The person's own name and picture, details and privacy. */
 export function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const core = useHavenCore();
-  const user = useAuthStore((s) => s.user);
-  const userId = user?.id ?? null;
+  const userId = useMe();
+  const username = useStore("profiles", (s) =>
+    userId ? (s.byId[userId]?.username ?? "") : "",
+  );
+  const avatarUrl = useAvatarUrl(userId);
+  const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!userId) return;
-    void core.profiles.ensureViewerProfile(userId).catch(() => {});
-  }, [core.profiles, userId]);
+    if (userId) void core.profiles.ensure([userId]);
+    void core.client.auth
+      .getSession()
+      .then(({ data }) => setEmail(data.session?.user.email ?? null));
+  }, [core, userId]);
 
-  const viewerProfile = useViewerProfile(core.profiles, userId);
-  const liveProfiles = useProfilesRecord(core.profiles);
-
-  const identity = useMemo(() => {
-    const email = user?.email ?? null;
-    const emailLocalPart = email?.split("@")[0]?.trim() ?? "";
-    const fallbackUsername =
-      (viewerProfile?.username ?? emailLocalPart) || "User";
-    const username =
-      resolveLiveUsername(liveProfiles, userId, fallbackUsername) ??
-      fallbackUsername;
-    const avatarUrl =
-      resolveLiveAvatarUrl(
-        liveProfiles,
-        userId,
-        viewerProfile?.avatarUrl ?? null,
-      ) ??
-      viewerProfile?.avatarUrl ??
-      null;
-    return { userId, email, username, avatarUrl };
-  }, [liveProfiles, user?.email, userId, viewerProfile]);
-
-  const [draftUsername, setDraftUsername] = useState(identity.username);
+  const [draftUsername, setDraftUsername] = useState(username);
   const [isUsernameDirty, setIsUsernameDirty] = useState(false);
   const [pendingAvatarPreviewUri, setPendingAvatarPreviewUri] = useState<
     string | null
@@ -64,50 +43,31 @@ export function ProfileScreen({ navigation }: Props) {
   const [isSavingAccount, setIsSavingAccount] = useState(false);
 
   useEffect(() => {
-    if (!isUsernameDirty) {
-      setDraftUsername(identity.username);
-    }
-  }, [identity.username, isUsernameDirty]);
-
-  const previewAvatarUrl = pendingAvatarPreviewUri ?? identity.avatarUrl;
+    if (!isUsernameDirty) setDraftUsername(username);
+  }, [username, isUsernameDirty]);
 
   const handleAvatarPicked = useCallback(
     async (asset: PickedAvatarAsset) => {
-      if (!identity.userId) {
-        Alert.alert("Not signed in", "Sign in to update your profile photo.");
-        return;
-      }
-      const username = identity.username.trim();
-      if (!username) {
-        Alert.alert(
-          "Username missing",
-          "Set a username before updating your photo.",
-        );
-        return;
-      }
       setPendingAvatarPreviewUri(asset.uri);
       try {
         const { body, contentType } = await loadPickedAvatarForUpload(asset);
         if (body.byteLength <= 0)
           throw new Error("Prepared image is empty; try another photo.");
-        await core.profiles.updateViewerProfile({
-          userId: identity.userId,
-          username,
-          avatarUrl: identity.avatarUrl,
-          avatarFile: body,
-          avatarContentType: contentType,
+        await core.setAvatar({
+          body,
+          mime_type: contentType,
+          size_bytes: body.byteLength,
         });
       } catch (err) {
-        const message =
-          err instanceof Error && err.message.trim().length > 0
-            ? err.message
-            : "Could not save your profile photo. Try again.";
-        Alert.alert("Upload failed", message);
+        Alert.alert(
+          "Upload failed",
+          getErrorMessage(err, "Could not save your profile photo. Try again."),
+        );
       } finally {
         setPendingAvatarPreviewUri(null);
       }
     },
-    [core, identity.avatarUrl, identity.userId, identity.username],
+    [core],
   );
 
   const { pickAvatar, isPicking } = useProfileAvatarPicker({
@@ -120,39 +80,25 @@ export function ProfileScreen({ navigation }: Props) {
       Alert.alert("Username required", "Please enter a username.");
       return;
     }
-    if (!identity.userId) {
-      Alert.alert("Not signed in", "Sign in to save your profile.");
-      return;
-    }
-    if (nextUsername === identity.username.trim()) {
+    if (nextUsername === username.trim()) {
       setIsUsernameDirty(false);
       setIsEditingName(false);
       return;
     }
     setIsSavingAccount(true);
     try {
-      await core.profiles.updateViewerProfile({
-        userId: identity.userId,
-        username: nextUsername,
-        avatarUrl: identity.avatarUrl,
-      });
+      await core.updateProfile({ username: nextUsername });
       setIsUsernameDirty(false);
       setIsEditingName(false);
     } catch (error) {
       Alert.alert(
         "Save failed",
-        getErrorMessage(error, "Could not save account settings."),
+        getErrorMessage(error, "Could not save your username."),
       );
     } finally {
       setIsSavingAccount(false);
     }
-  }, [
-    core,
-    draftUsername,
-    identity.avatarUrl,
-    identity.userId,
-    identity.username,
-  ]);
+  }, [core, draftUsername, username]);
 
   return (
     <View className="flex-1 bg-background">
@@ -189,18 +135,18 @@ export function ProfileScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <UserAccountCard
-          email={identity.email}
-          displayUsername={identity.username}
+          email={email}
+          displayUsername={username}
           inputUsername={draftUsername}
-          avatarUrl={previewAvatarUrl}
+          avatarUrl={pendingAvatarPreviewUri ?? avatarUrl}
           isEditingName={isEditingName}
           isSaving={isSavingAccount || isPicking}
           onPressEditName={() => {
-            if (!isUsernameDirty) setDraftUsername(identity.username);
+            if (!isUsernameDirty) setDraftUsername(username);
             setIsEditingName(true);
           }}
           onPressCancelEditName={() => {
-            setDraftUsername(identity.username);
+            setDraftUsername(username);
             setIsUsernameDirty(false);
             setIsEditingName(false);
           }}
@@ -214,13 +160,7 @@ export function ProfileScreen({ navigation }: Props) {
           }}
         />
 
-        <ProfileDetailsSettingsCard
-          userId={identity.userId}
-          username={identity.username}
-          avatarUrl={identity.avatarUrl}
-          profileVisibility={viewerProfile?.profileVisibility ?? "private"}
-          profileBio={viewerProfile?.profileBio ?? null}
-        />
+        <ProfileDetailsSettingsCard />
 
         <Pressable
           accessibilityRole="button"

@@ -8,7 +8,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { OnboardingCampaign } from "@shared/lib/backend/types";
+import type { OnboardingCampaign } from "@shared/lib/backend/records";
 import { Icon } from "@/components/ui/icon";
 import {
   MOBILE_ONBOARDING_CARDS,
@@ -20,6 +20,8 @@ type MobileOnboardingScreenProps = {
   completing: boolean;
   error: string | null;
   onComplete: () => void;
+  /** Shown only when the introduction is not required. */
+  onSkip: () => void;
 };
 
 const ANIMATION_CONFIG = {
@@ -163,6 +165,7 @@ export function MobileOnboardingScreen({
   completing,
   error,
   onComplete,
+  onSkip,
 }: MobileOnboardingScreenProps) {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
@@ -214,7 +217,20 @@ export function MobileOnboardingScreen({
         <Text className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Haven Alpha
         </Text>
-        <View className="flex-row gap-1.5">{dots}</View>
+        <View className="flex-row items-center gap-3">
+          <View className="flex-row gap-1.5">{dots}</View>
+          {campaign.required ? null : (
+            <Pressable
+              accessibilityRole="button"
+              disabled={completing}
+              onPress={onSkip}
+            >
+              <Text className="text-sm font-semibold text-muted-foreground">
+                Skip
+              </Text>
+            </Pressable>
+          )}
+        </View>
       </View>
 
       <Animated.View

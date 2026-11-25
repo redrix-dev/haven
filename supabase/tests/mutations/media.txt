@@ -1,0 +1,27 @@
+# 08_media: upload slots, attaching, reading, releasing, avatars, abandoned uploads.
+08 @@ an attachment goes to the public bucket @@ select pg_temp.mutate('public.create_upload(public.media_purpose,text,bigint,text,integer,integer)', $m$case p_purpose when 'avatar' then 'avatars' else 'media' end;$m$, $m$'avatars';$m$);
+08 @@ any kind of file can be uploaded @@ select pg_temp.mutate('public.create_upload(public.media_purpose,text,bigint,text,integer,integer)', $m$if p_mime_type is null or not (p_mime_type = any (v_types)) then$m$, $m$if false then$m$);
+08 @@ a file of any size can be uploaded @@ select pg_temp.mutate('public.create_upload(public.media_purpose,text,bigint,text,integer,integer)', $m$or p_size_bytes > v_limit then$m$, $m$then$m$);
+08 @@ the path does not start with the owner @@ alter table public.media drop column object_path; alter table public.media add column object_path text generated always as (id::text) stored;
+08 @@ the owner can upload anywhere in the bucket @@ select pg_temp.mutate('private.can_upload(text,text)', $m$and m.object_path = p_object_path$m$, $m$$m$);
+08 @@ anyone can upload into someone else's slot @@ select pg_temp.mutate('private.can_upload(text,text)', $m$and m.owner_id = auth.uid()$m$, $m$$m$);
+08 @@ a used slot can be uploaded into again @@ select pg_temp.mutate('private.can_upload(text,text)', $m$and m.status = 'pending'$m$, $m$$m$);
+08 @@ a file can be attached before it is uploaded @@ select pg_temp.mutate('private.claim_upload(uuid,uuid,public.media_purpose,uuid)', $m$if v_object.id is null then$m$, $m$if false then$m$);
+08 @@ someone else's upload can be attached @@ select pg_temp.mutate('private.claim_upload(uuid,uuid,public.media_purpose,uuid)', $m$or v_row.owner_id <> p_owner_id$m$, $m$$m$);
+08 @@ an upload can be attached twice @@ select pg_temp.mutate('private.claim_upload(uuid,uuid,public.media_purpose,uuid)', $m$or v_row.status <> 'pending' then$m$, $m$then$m$);
+08 @@ an attachment can be used as a profile picture @@ select pg_temp.mutate('private.claim_upload(uuid,uuid,public.media_purpose,uuid)', $m$or v_row.purpose <> p_purpose$m$, $m$$m$);
+08 @@ an attached file is not tied to its message @@ select pg_temp.mutate('private.claim_upload(uuid,uuid,public.media_purpose,uuid)', $m$message_id = p_message_id,$m$, $m$message_id = null,$m$);
+08 @@ a message cannot be just a file @@ select pg_temp.mutate('public.send_message(uuid,text,uuid,uuid[],uuid)', $m$if v_body = '' and cardinality(v_attachment_ids) = 0 then$m$, $m$if v_body = '' then$m$);
+08 @@ anyone signed in can read any attachment @@ select pg_temp.mutate('private.can_read_media(text,text)', $m$private.can_view_channel(m.channel_id, auth.uid())$m$, $m$true$m$);
+08 @@ someone who can see the message cannot read its file @@ select pg_temp.mutate('private.can_read_media(text,text)', $m$or (f.status = 'attached' and m.id is not null and private.can_view_channel(m.channel_id, auth.uid()))$m$, $m$$m$);
+08 @@ storage serves files to everyone signed in @@ drop policy "read files on visible messages" on storage.objects; create policy "read files on visible messages" on storage.objects for select to authenticated using (bucket_id = 'media');
+08 @@ the owner can overwrite a stored file @@ create policy overwrite on storage.objects for update to authenticated using (owner = (select auth.uid()));
+08 @@ deleting a message keeps its file @@ drop trigger messages_release_media on public.messages;
+08 @@ a released file is not queued for deletion @@ select pg_temp.mutate('private.release_media(uuid)', $m$if found and not private.media_is_held(p_media_id) then$m$, $m$if false then$m$);
+08 @@ a released file is still served @@ select pg_temp.mutate('private.can_read_media(text,text)', $m$f.owner_id = auth.uid()$m$, $m$true$m$);
+08 @@ the delete worker is not told where the file is @@ select pg_temp.mutate('public.worker_media_to_delete(uuid)', $m$and (m.status = 'released' or$m$, $m$and (false or$m$);
+08 @@ the delete worker may take a fresh unused upload @@ select pg_temp.mutate('public.worker_media_to_delete(uuid)', $m$(m.status = 'pending' and m.created_at < now() - interval '1 day')$m$, $m$(m.status = 'pending')$m$);
+08 @@ the row of a deleted file is kept @@ select pg_temp.mutate('public.worker_media_deleted(uuid)', $m$and m.status in ('released', 'pending')$m$, $m$and false$m$);
+08 @@ replacing a picture keeps the old file @@ select pg_temp.mutate('public.set_my_avatar(uuid)', $m$if v_old is not null then$m$, $m$if false then$m$);
+08 @@ a new picture is not announced @@ drop trigger profiles_announce on public.profiles;
+08 @@ abandoned uploads are never swept @@ select pg_temp.mutate('private.sweep_abandoned_uploads()', $m$interval '1 day'$m$, $m$interval '100 years'$m$);

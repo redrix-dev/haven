@@ -1,9 +1,7 @@
-export type VoiceMemberAction =
-  | "mute"
-  | "unmute"
-  | "deafen"
-  | "undeafen"
-  | "remove";
+import type { VoiceControl } from "@shared/lib/backend/realtime";
+import type { VoiceControlAction } from "@shared/lib/backend/records";
+
+export type VoiceMemberAction = VoiceControlAction;
 export type VoiceControlEvent = {
   communityId: string;
   channelId: string;
@@ -15,35 +13,18 @@ export type VoiceControlEvent = {
   action: VoiceMemberAction;
 };
 
-export function parseVoiceControlEvent(
-  payload: Record<string, unknown>,
-): VoiceControlEvent | null {
-  const keys = [
-    "community_id",
-    "channel_id",
-    "channel_name",
-    "target_user_id",
-    "target_session_id",
-    "actor_user_id",
-    "actor_name",
-  ] as const;
-  if (keys.some((key) => typeof payload[key] !== "string" || !payload[key]))
-    return null;
-  if (
-    !["mute", "unmute", "deafen", "undeafen", "remove"].includes(
-      String(payload.action),
-    )
-  )
-    return null;
+/** The `voice.control` event as the voice session names it. */
+export function voiceControlEvent(control: VoiceControl): VoiceControlEvent {
   return {
-    communityId: payload.community_id as string,
-    channelId: payload.channel_id as string,
-    channelName: payload.channel_name as string,
-    targetUserId: payload.target_user_id as string,
-    targetSessionId: payload.target_session_id as string,
-    actorUserId: payload.actor_user_id as string,
-    actorName: payload.actor_name as string,
-    action: payload.action as VoiceMemberAction,
+    communityId: control.community_id,
+    channelId: control.channel_id,
+    channelName: control.channel_name,
+    targetUserId: control.target_user_id,
+    targetSessionId: control.target_session_id,
+    actorUserId: control.actor_id,
+    // A deleted account has no name.
+    actorName: control.actor_name ?? "a moderator",
+    action: control.action,
   };
 }
 

@@ -11,7 +11,7 @@ export function VoiceAudioSettings() {
   const core = requireHavenSolidCore();
   const controller = useVoice();
   const { voice, switchInputDevice, setOutputDevice } = controller;
-  const settings = () => core.voice.state.settings;
+  const settings = () => core.stores.voice.settings;
   const [recording, setRecording] = createSignal(false);
   return (
     <div class="space-y-5">

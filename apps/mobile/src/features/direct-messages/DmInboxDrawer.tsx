@@ -1,12 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
   Text,
   View,
-  type ListRenderItem,
 } from "react-native";
 // uniwind-theme-allow mobile-theme/no-direct-ionicons - Ionicons kept for amber shield icon (ModMail brand color has no semantic token)
 import { Ionicons } from "@expo/vector-icons";
@@ -17,26 +17,25 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import { useHavenCore } from "@mobile-data";
 import {
-  useCommunities,
-  useDmConversations,
-  useDmConversationsLoading,
-  useFriends,
-  useIsLoading,
-  usePermissionsByCommunityId,
-  useProfilesRecord,
-} from "@mobile-data/hooks";
-import {
-  resolveLiveAvatarUrl,
-  resolveLiveUsername,
-} from "@shared/lib/liveProfiles";
+  conversations as conversationList,
+  isMuted,
+  otherPerson,
+  unreadCount,
+} from "@shared/collections/channels/selectors";
+import { latestMessage } from "@shared/collections/messages/selectors";
+import { friendIds } from "@shared/collections/social/selectors";
+import { answered } from "@shared/collections/kit/requests";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import type {
-  DirectMessageConversationSummary,
-  FriendSummary,
-} from "@shared/lib/backend/types";
 import { resolveColorProp } from "@shared/themes";
+import {
+  useAvatarUrl,
+  useCore,
+  useHavenCore,
+  useMe,
+  useNameOf,
+  useStore,
+} from "@mobile-data";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { MobileModmailPanel } from "@/features/moderation/MobileModmailPanel";
 
@@ -49,37 +48,24 @@ const TOGGLE_STEP = TOGGLE_BUTTON_SIZE + TOGGLE_GAP;
 type DmInboxDrawerProps = {
   /** Called after a conversation is opened — signals the shell to close the drawer. */
   onConversationSelected: () => void;
-  onStartDirectMessage: (userId: string) => void;
 };
 
-export function DmInboxDrawer({
-  onConversationSelected,
-  onStartDirectMessage,
-}: DmInboxDrawerProps) {
+export function DmInboxDrawer({ onConversationSelected }: DmInboxDrawerProps) {
   const insets = useSafeAreaInsets();
   const themeTokens = useMobileThemeTokens();
   const foregroundColor =
     resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const core = useHavenCore();
-  const dm = core.directMessages;
-  const social = core.social;
-  const liveProfiles = useProfilesRecord(core.profiles);
-  const communities = useCommunities(core.communities);
-  const permissionsByCommunityId = usePermissionsByCommunityId(
-    core.permissions,
-  );
+  const me = useMe() ?? "";
 
-  // ── ModMail availability ────────────────────────────────────────────────
-  const modmailCommunityIds = useMemo(
-    () =>
-      communities
-        .filter((c) => permissionsByCommunityId[c.id]?.canManageReports)
-        .map((c) => c.id),
-    [communities, permissionsByCommunityId],
+  // ModMail: the communities whose reports the person handles.
+  const modmailCommunityIds = useCore(["communities"], (s) =>
+    Object.keys(s.communities.byId).filter((id) =>
+      s.communities.permissions[id]?.includes("manage_reports"),
+    ),
   );
   const modmailEnabled = modmailCommunityIds.length > 0;
 
-  // ── Mode toggle ─────────────────────────────────────────────────────────
   const [mode, setMode] = useState<DrawerMode>("conversations");
   const [newDmOpen, setNewDmOpen] = useState(false);
   const indicatorOffset = useSharedValue(0);
@@ -99,188 +85,60 @@ export function DmInboxDrawer({
     transform: [{ translateX: indicatorOffset.value }],
   }));
 
-  // ── Conversation list data ──────────────────────────────────────────────
-  const conversations = useDmConversations(dm);
-  const friends = useFriends(social);
-  const socialLoading = useIsLoading(social);
-  const isLoading = useDmConversationsLoading(dm);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const conversationIds = useStore("channels", (s) =>
+    conversationList(s).map((c) => c.id),
+  );
+  const conversationsLoaded = useStore("channels", (s) =>
+    answered(s.requests, "conversations"),
+  );
+  const conversationsError = useStore(
+    "channels",
+    (s) => s.requests.conversations?.error ?? null,
+  );
+  const friends = useStore("social", (s) => friendIds(s, me));
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    setError(null);
+  // The people and the newest message of every conversation listed.
+  useEffect(() => {
+    const channels = core.stores.channels.getState();
+    const people = conversationIds
+      .map((id) => otherPerson(channels, id, me))
+      .filter((id): id is string => id !== null);
+    void core.profiles.ensure(people);
+    if (conversationIds.length > 0)
+      void core.messages.loadLatest(conversationIds);
+  }, [conversationIds, core, me]);
+
+  useEffect(() => {
+    if (newDmOpen) void core.profiles.ensure(friends);
+  }, [core, friends, newDmOpen]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await core.channels.loadConversations();
+    setRefreshing(false);
+  };
+
+  const openConversation = (channelId: string) => {
+    onConversationSelected();
+    void core.openConversation(channelId);
+  };
+
+  const startWith = async (userId: string) => {
     try {
-      await dm.loadConversations();
-    } catch (err) {
-      setError(getErrorMessage(err, "Failed to load messages."));
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [dm]);
-
-  const openNewDm = useCallback(() => {
-    setNewDmOpen(true);
-    setError(null);
-    void social.ensureLoaded().catch((err) => {
-      setError(getErrorMessage(err, "Failed to load friends."));
-    });
-  }, [social]);
-
-  const handleSelectConversation = useCallback(
-    (conversationId: string) => {
-      setError(null);
+      await core.openConversationWith(userId);
+      setNewDmOpen(false);
       onConversationSelected();
-      void dm
-        .openConversation(conversationId, { markRead: true })
-        .catch((err) => {
-          setError(getErrorMessage(err, "Failed to open conversation."));
-        });
-    },
-    [dm, onConversationSelected],
-  );
-
-  const getPeerLabel = useCallback(
-    (c: DirectMessageConversationSummary) => {
-      return (
-        resolveLiveUsername(
-          liveProfiles,
-          c.otherUserId,
-          c.otherUsername,
-        )?.trim() ||
-        c.otherUsername ||
-        "Direct"
+    } catch (error) {
+      Alert.alert(
+        "Couldn't start a conversation",
+        getErrorMessage(error, "Try again in a moment."),
       );
-    },
-    [liveProfiles],
-  );
-
-  const renderConversation: ListRenderItem<DirectMessageConversationSummary> =
-    useCallback(
-      ({ item }) => {
-        const unread = item.unreadCount > 0;
-        const label = getPeerLabel(item);
-        const avatarUrl = resolveLiveAvatarUrl(
-          liveProfiles,
-          item.otherUserId,
-          item.otherAvatarUrl,
-        );
-        const initial = label.slice(0, 1).toUpperCase() || "D";
-        return (
-          <Pressable
-            onPress={() => void handleSelectConversation(item.conversationId)}
-            accessibilityRole="button"
-            accessibilityLabel={`Open conversation with ${label}`}
-            className="flex-row items-center gap-3 border-b border-border-panel px-4 py-3 active:bg-surface-hover"
-          >
-            <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
-              {avatarUrl ? (
-                <Image
-                  source={{ uri: avatarUrl }}
-                  style={{ width: 40, height: 40 }}
-                  resizeMode="cover"
-                  accessibilityLabel={`${label} avatar`}
-                  accessibilityIgnoresInvertColors
-                />
-              ) : (
-                <Text className="text-base font-semibold text-foreground">
-                  {initial}
-                </Text>
-              )}
-            </View>
-            <View className="min-w-0 flex-1">
-              <Text
-                className={`text-sm leading-5 ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-                numberOfLines={2}
-              >
-                {label}
-              </Text>
-              <Text
-                className="text-xs leading-4 text-muted-foreground"
-                numberOfLines={2}
-              >
-                {item.lastMessagePreview ?? "No messages yet"}
-              </Text>
-            </View>
-            {unread ? (
-              <View className="min-w-6 rounded-full bg-primary px-1.5 py-0.5">
-                <Text className="text-center text-xs font-bold leading-4 text-primary-foreground">
-                  {item.unreadCount > 99 ? "99+" : String(item.unreadCount)}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
-        );
-      },
-      [getPeerLabel, handleSelectConversation],
-    );
-
-  const renderFriend: ListRenderItem<FriendSummary> = useCallback(
-    ({ item }) => {
-      const label =
-        resolveLiveUsername(
-          liveProfiles,
-          item.friendUserId,
-          item.username,
-        )?.trim() || item.username;
-      const avatarUrl = resolveLiveAvatarUrl(
-        liveProfiles,
-        item.friendUserId,
-        item.avatarUrl,
-      );
-      const initial = label.slice(0, 1).toUpperCase() || "U";
-
-      return (
-        <Pressable
-          onPress={() => {
-            setNewDmOpen(false);
-            onConversationSelected();
-            onStartDirectMessage(item.friendUserId);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Start direct message with ${label}`}
-          className="flex-row items-center gap-3 border-b border-border-panel px-4 py-3 active:bg-surface-hover"
-        >
-          <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
-            {avatarUrl ? (
-              <Image
-                source={{ uri: avatarUrl }}
-                style={{ width: 40, height: 40 }}
-                resizeMode="cover"
-                accessibilityLabel={`${label} avatar`}
-                accessibilityIgnoresInvertColors
-              />
-            ) : (
-              <Text className="text-base font-semibold text-foreground">
-                {initial}
-              </Text>
-            )}
-          </View>
-          <View className="min-w-0 flex-1">
-            <Text
-              className="text-sm font-semibold leading-5 text-foreground"
-              numberOfLines={1}
-            >
-              {label}
-            </Text>
-            <Text
-              className="text-xs leading-4 text-muted-foreground"
-              numberOfLines={1}
-            >
-              Start a direct message
-            </Text>
-          </View>
-        </Pressable>
-      );
-    },
-    [liveProfiles, onConversationSelected, onStartDirectMessage],
-  );
-
-  // ── Render ───────────────────────────────────────────────────────────────
+    }
+  };
 
   return (
     <View className="flex-1 border-r border-border-panel bg-surface-modal">
-      {/* ── Drawer header ── */}
       <View
         className="border-b border-border-panel px-4 pb-3"
         style={{ paddingTop: insets.top + 16 }}
@@ -309,7 +167,7 @@ export function DmInboxDrawer({
             </Pressable>
           ) : mode === "conversations" ? (
             <Pressable
-              onPress={openNewDm}
+              onPress={() => setNewDmOpen(true)}
               accessibilityRole="button"
               accessibilityLabel="Start new direct message"
               className="h-9 w-9 items-center justify-center rounded-xl bg-surface-panel active:bg-surface-hover"
@@ -322,10 +180,8 @@ export function DmInboxDrawer({
             </Pressable>
           ) : null}
 
-          {/* Mode toggle — only shown when user has modmail communities */}
           {modmailEnabled && !newDmOpen ? (
             <View className="relative flex-row items-center">
-              {/* Sliding highlight pill */}
               <Animated.View
                 style={[{ position: "absolute", left: 0 }, indicatorStyle]}
                 pointerEvents="none"
@@ -338,8 +194,6 @@ export function DmInboxDrawer({
                   className="rounded-xl bg-surface-hover"
                 />
               </Animated.View>
-
-              {/* Conversations icon */}
               <Pressable
                 onPress={() => handleModeSwitch("conversations")}
                 accessibilityRole="button"
@@ -361,10 +215,7 @@ export function DmInboxDrawer({
                   }
                 />
               </Pressable>
-
               <View style={{ width: TOGGLE_GAP }} />
-
-              {/* ModMail (shield) icon — amber to match existing modmail visual language */}
               <Pressable
                 onPress={() => handleModeSwitch("modmail")}
                 accessibilityRole="button"
@@ -388,56 +239,146 @@ export function DmInboxDrawer({
         </View>
       </View>
 
-      {/* ── Content area ── */}
       {newDmOpen ? (
-        <>
-          {error ? (
-            <Text className="px-4 pt-2 text-xs text-destructive">{error}</Text>
-          ) : null}
-          {socialLoading && friends.length === 0 ? (
-            <View className="flex-1 items-center justify-center">
-              <ActivityIndicator color={foregroundColor} />
-            </View>
-          ) : (
-            <FlatList
-              data={friends}
-              keyExtractor={(friend) => friend.friendUserId}
-              renderItem={renderFriend}
-              ListEmptyComponent={
-                <Text className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  Add friends to start a new direct message.
-                </Text>
-              }
+        <FlatList
+          data={friends}
+          keyExtractor={(id) => id}
+          renderItem={({ item }) => (
+            <PersonRow
+              userId={item}
+              subtitle="Start a conversation"
+              onPress={() => void startWith(item)}
             />
           )}
-        </>
+          ListEmptyComponent={
+            <Text className="px-4 py-8 text-center text-sm text-muted-foreground">
+              Add friends to start a conversation. Anyone whose settings allow
+              it can also be messaged from their profile.
+            </Text>
+          }
+        />
       ) : mode === "modmail" ? (
         <MobileModmailPanel managedCommunityIds={modmailCommunityIds} />
-      ) : (
-        <>
-          {error ? (
-            <Text className="px-4 pt-2 text-xs text-destructive">{error}</Text>
-          ) : null}
-          {isLoading && conversations.length === 0 ? (
-            <View className="flex-1 items-center justify-center">
-              <ActivityIndicator color={foregroundColor} />
-            </View>
+      ) : !conversationsLoaded && conversationIds.length === 0 ? (
+        <View className="flex-1 items-center justify-center px-6">
+          {conversationsError ? (
+            <Text className="text-center text-sm text-destructive">
+              {getErrorMessage(conversationsError, "Failed to load messages.")}
+            </Text>
           ) : (
-            <FlatList
-              data={conversations}
-              keyExtractor={(c) => c.conversationId}
-              renderItem={renderConversation}
-              refreshing={isRefreshing}
-              onRefresh={() => void handleRefresh()}
-              ListEmptyComponent={
-                <Text className="px-4 py-8 text-center text-sm text-muted-foreground">
-                  No direct messages yet.
-                </Text>
-              }
+            <ActivityIndicator color={foregroundColor} />
+          )}
+        </View>
+      ) : (
+        <FlatList
+          data={conversationIds}
+          keyExtractor={(id) => id}
+          renderItem={({ item }) => (
+            <ConversationRow
+              channelId={item}
+              onPress={() => openConversation(item)}
             />
           )}
-        </>
+          refreshing={refreshing}
+          onRefresh={() => void refresh()}
+          ListEmptyComponent={
+            <Text className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No conversations yet.
+            </Text>
+          }
+        />
       )}
     </View>
+  );
+}
+
+function ConversationRow({
+  channelId,
+  onPress,
+}: {
+  channelId: string;
+  onPress: () => void;
+}) {
+  const me = useMe() ?? "";
+  const peerId = useStore("channels", (s) => otherPerson(s, channelId, me));
+  const unread = useStore("channels", (s) =>
+    isMuted(s, channelId) ? 0 : unreadCount(s, channelId),
+  );
+  const preview = useStore(
+    "messages",
+    (s) => latestMessage(s, channelId)?.body ?? null,
+  );
+  return (
+    <PersonRow
+      userId={peerId ?? ""}
+      subtitle={preview ?? "No messages yet"}
+      unread={unread}
+      onPress={onPress}
+    />
+  );
+}
+
+function PersonRow({
+  userId,
+  subtitle,
+  unread = 0,
+  onPress,
+}: {
+  userId: string;
+  subtitle: string;
+  unread?: number;
+  onPress: () => void;
+}) {
+  const label = useNameOf(userId);
+  const avatarUrl = useAvatarUrl(userId);
+  const initial = label.slice(0, 1).toUpperCase() || "?";
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={
+        unread > 0
+          ? `${label}, ${unread} unread`
+          : `Open conversation with ${label}`
+      }
+      className="flex-row items-center gap-3 border-b border-border-panel px-4 py-3 active:bg-surface-hover"
+    >
+      <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
+        {avatarUrl ? (
+          <Image
+            source={{ uri: avatarUrl }}
+            style={{ width: 40, height: 40 }}
+            resizeMode="cover"
+            accessibilityLabel={`${label} avatar`}
+            accessibilityIgnoresInvertColors
+          />
+        ) : (
+          <Text className="text-base font-semibold text-foreground">
+            {initial}
+          </Text>
+        )}
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text
+          className={`text-sm leading-5 ${unread > 0 ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        <Text
+          className="text-xs leading-4 text-muted-foreground"
+          numberOfLines={2}
+        >
+          {subtitle}
+        </Text>
+      </View>
+      {unread > 0 ? (
+        <View className="min-w-6 rounded-full bg-primary px-1.5 py-0.5">
+          <Text className="text-center text-xs font-bold leading-4 text-primary-foreground">
+            {unread > 99 ? "99+" : String(unread)}
+          </Text>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }

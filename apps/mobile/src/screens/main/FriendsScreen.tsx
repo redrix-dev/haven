@@ -1,11 +1,6 @@
-import { useCallback, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHavenCore } from "@mobile-data";
-import { useAuthStore } from "@mobile-data/session/authStore";
-import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
-import UserProfileModal from "@/features/user-profile/UserProfileModal";
 import { FriendsSurface } from "@/features/friends/FriendsSurface";
 import type { MainStackParamList } from "@/navigation/types";
 import { ThemedIonicons } from "@/theme-rn";
@@ -14,39 +9,6 @@ type Props = NativeStackScreenProps<MainStackParamList, "Friends">;
 
 export function FriendsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
-  const core = useHavenCore();
-  const userId = useAuthStore((s) => s.user?.id ?? null);
-  const [profileTarget, setProfileTarget] =
-    useState<UserProfileModalTarget | null>(null);
-
-  const handleOpenDmWithUser = useCallback(
-    async (targetUserId: string) => {
-      const conversationId =
-        await core.directMessages.openWithUser(targetUserId);
-      navigation.navigate("Community", {
-        pendingDmConversationId: conversationId,
-        serverId: null,
-        openDrawer: false,
-      });
-    },
-    [core.directMessages, navigation],
-  );
-
-  const handleStartDirectMessage = useCallback(
-    (targetUserId: string) => {
-      setProfileTarget(null);
-      void handleOpenDmWithUser(targetUserId).catch((error) => {
-        Alert.alert(
-          "Message failed",
-          error instanceof Error
-            ? error.message
-            : "Could not open that conversation.",
-        );
-      });
-    },
-    [handleOpenDmWithUser],
-  );
-
   return (
     <View className="flex-1 bg-background">
       <View
@@ -73,20 +35,16 @@ export function FriendsScreen({ navigation, route }: Props) {
 
       <View className="min-h-0 flex-1 px-4 pt-4">
         <FriendsSurface
-          userId={userId}
           initialTab={route.params?.initialTab ?? "friends"}
           highlightedRequestId={route.params?.highlightedRequestId ?? null}
-          onStartDirectMessage={handleStartDirectMessage}
-          onOpenProfile={setProfileTarget}
+          onOpenConversation={(channelId) =>
+            navigation.navigate("Community", {
+              pendingDmConversationId: channelId,
+              openDrawer: false,
+            })
+          }
         />
       </View>
-
-      <UserProfileModal
-        visible={Boolean(profileTarget)}
-        target={profileTarget}
-        onDismiss={() => setProfileTarget(null)}
-        onStartDirectMessage={handleStartDirectMessage}
-      />
     </View>
   );
 }

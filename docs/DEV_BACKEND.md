@@ -24,6 +24,16 @@ npm run devdb -- run -- npm run tauri:build
 npm run devdb -- run -- npm run mobile:run:ios:device
 ```
 
+An `ios/` folder made without `devdb run` (a production build, a plain
+prebuild) has no http exception for the dev host, and `expo run:ios` reuses it
+as is: every request fails with "App Transport Security policy requires the use
+of a secure connection". `devdb run` checks for this and stops. Regenerate it
+under the dev backend first, and again when going back to production:
+
+```bash
+npm run devdb -- run -- npm run mobile:native:prebuild
+```
+
 Sign in with the fixture users from
 `tooling/scripts/test/bootstrap-local-auth-users.mjs`, for example
 `rls-owner@example.test` / `HavenTest!Owner1`.
@@ -118,29 +128,35 @@ The demo keys are public knowledge, so reachability is the only lock.
 
 `seed` always runs three layers, in order. Every layer is safe to re-run.
 
-1. **Accounts** — the seven fixture users, created through the Auth admin API.
+1. **Accounts** — the nine fixture users, created through the Auth admin API.
 2. **Baseline** — `supabase/tests/_helpers` and `supabase/tests/fixtures`, the
-   same files the SQL and backend suites use (`TEST:RLS Community`, platform
-   staff). This layer also clears the fixture users' friends, DMs and
-   notifications.
+   same files the SQL and backend suites use (`TEST: Hearth`, platform
+   staff). This layer also clears the fixture users' friends, conversations
+   and notifications.
 3. **Dev packs** — `supabase/seeds/dev/*.sql`. `NN_name.sql` is the pack `name`.
 
-| Pack        | What you get                                                                                            |
-| ----------- | ------------------------------------------------------------------------------------------------------- |
-| `community` | `DEV: Hearth` with a read-only channel, a moderators-only channel, a voice channel, members and a mod.  |
-| `chatter`   | A short conversation: replies, an edit, a soft delete, a link, a mention, long and multi-line messages. |
-| `social`    | A friendship with a DM thread and a pending friend request, made through the real RPCs.                 |
-| `volume`    | 3,000 numbered messages across 60 days in `#scrollback`.                                                |
-| `workers`   | Turns on the pg_cron jobs that call the edge functions, if the host has a cron secret.                  |
+| Pack        | What you get                                                                                                                                                                                         |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `community` | `DEV: Hearth` with a read-only channel, a moderators-only channel, a voice channel, members and a mod. Also a required introduction that joins `rls_non_member` to it, for trying mobile onboarding. |
+| `chatter`   | A short conversation: replies, an edit, a deleted message, a link, a mention, reactions, long and multi-line messages.                                                                               |
+| `social`    | A friendship with a conversation and a waiting friend request, made through the real RPCs.                                                                                                           |
+| `volume`    | 3,000 numbered messages across 60 days in `#scrollback`.                                                                                                                                             |
+| `workers`   | Tells the database where the worker functions are, if the host has a worker secret. Without one it queues jobs and calls nobody.                                                                     |
 
 `npm run devdb -- seed chatter volume` rebuilds only those packs (plus layers 1
 and 2, which means `social` is cleared until it is seeded again).
 
 To add a pack, add a numbered `.sql` file. Name everything it creates with a
-`DEV:` prefix or keep it inside `DEV: Hearth`, delete-then-insert so it can
-re-run, and prefer calling the real RPC as the acting user
-(`test_support.set_jwt_claims`) over inserting rows, so the seed exercises the
-same path the apps do.
+`DEV:` prefix or keep it inside `DEV: Hearth`, remove what it made before
+making it again so it can re-run, and call the real RPC as the acting user
+(`test_support.become('member_a')`) rather than inserting rows, so the seed
+exercises the same path the apps do. `volume` is the one exception, and says
+why.
+
+> The dev backend's schema is the rebuilt database
+> ([DATABASE.md](architecture/DATABASE.md)), with Edge Functions written for
+> it. The apps have not been rewritten against it yet, so a client build
+> pointed here will not work until they are.
 
 ## Secrets And Voice
 
@@ -226,7 +242,8 @@ not restarted (`down`, then `up`) after editing them.
 
 Known gaps:
 
-- `expo-push-worker` answers 500 every five minutes: there is no
-  `EXPO_ACCESS_TOKEN`, on purpose.
+- `push-worker` sends without an `EXPO_ACCESS_TOKEN`, and `mail-worker`
+  jobs wait for a `RESEND_API_KEY`; neither is set on flex, on purpose.
+  The settings are listed in `supabase/functions/README.md`.
 - A packaged dev-backend desktop build still checks GitHub for updates and
   would replace itself with the production build if a newer release exists.

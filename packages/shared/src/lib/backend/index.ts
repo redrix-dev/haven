@@ -1,29 +1,52 @@
-import type { CommunityDataBackend } from "./communityDataBackend.interface";
-import type { ControlPlaneBackend } from "./controlPlaneBackend";
-import type { DirectMessageBackend } from "./directMessageBackend";
-import type { ModerationBackend } from "./moderationBackend";
-import type { NotificationBackend } from "./notificationBackend";
-import type { ServerModmailBackend } from "./serverModmailBackend";
-import type { SocialBackend } from "./socialBackend";
+/**
+ * Haven's backend clients: one per area of docs/architecture/DATABASE.md,
+ * each a thin, typed door onto the database's RPCs and readable tables.
+ *
+ * What these clients promise:
+ * - Records keep the database's own field names and shapes (records.ts).
+ *   Nothing is renamed on the way, so there is no mapping to keep in step.
+ * - Every failure is a HavenError carrying the database's reason word.
+ * - No permission is decided here. The database decides; these ask.
+ */
 
-export type BackendMode = "central_supabase";
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
+import { createChannelsBackend } from "./channels";
+import { createCommunitiesBackend } from "./communities";
+import { createMediaBackend } from "./media";
+import { createMessagesBackend } from "./messages";
+import { createNotificationsBackend } from "./notifications";
+import { createPeopleBackend } from "./people";
+import { createRealtimeBackend } from "./realtime";
+import { createSafetyBackend } from "./safety";
+import { createSocialBackend } from "./social";
+import { createVoiceBackend } from "./voice";
 
-const DEFAULT_BACKEND_MODE: BackendMode = "central_supabase";
+export function createBackend(client: HavenSupabaseClient) {
+  return {
+    people: createPeopleBackend(client),
+    social: createSocialBackend(client),
+    communities: createCommunitiesBackend(client),
+    channels: createChannelsBackend(client),
+    messages: createMessagesBackend(client),
+    media: createMediaBackend(client),
+    notifications: createNotificationsBackend(client),
+    safety: createSafetyBackend(client),
+    voice: createVoiceBackend(client),
+    realtime: createRealtimeBackend(client),
+  };
+}
 
-const parseBackendMode = (value: string | undefined): BackendMode => {
-  if (value === "central_supabase") {
-    return value;
-  }
-  return DEFAULT_BACKEND_MODE;
-};
+export type Backend = ReturnType<typeof createBackend>;
 
-const resolveBackendModeFromEnv = (): string | undefined => {
-  if (typeof process === "undefined") {
-    return undefined;
-  }
-  return process.env?.HAVEN_BACKEND_MODE;
-};
-
-const backendMode = parseBackendMode(resolveBackendModeFromEnv());
-
-export const getBackendMode = (): BackendMode => backendMode;
+export * from "./channels";
+export * from "./communities";
+export * from "./havenError";
+export * from "./media";
+export * from "./messages";
+export * from "./notifications";
+export * from "./people";
+export * from "./realtime";
+export * from "./records";
+export * from "./safety";
+export * from "./social";
+export * from "./voice";

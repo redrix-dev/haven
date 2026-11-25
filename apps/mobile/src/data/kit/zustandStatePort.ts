@@ -1,5 +1,5 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { StatePort } from "@shared/nexus/kit/statePort";
+import type { StatePort } from "@shared/collections/kit/statePort";
 
 /** A state port backed by a vanilla zustand store, plus the store for React hooks. */
 export type ZustandStatePort<S extends object> = StatePort<S> & {
@@ -8,9 +8,9 @@ export type ZustandStatePort<S extends object> = StatePort<S> & {
 };
 
 /**
- * Mobile's state container for shared nexuses. Writes merge top-level keys and
+ * Mobile's state container for a collection. Writes merge top-level keys and
  * produce a new state object; unchanged slices keep their references, so the
- * selector hooks' equality checks skip re-renders as before.
+ * selector hooks' equality checks skip re-renders.
  */
 export function createZustandStatePort<S extends object>(
   initial: S,

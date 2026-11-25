@@ -1,10 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { playWebVoiceSound } from "./voiceSounds";
 import {
-  VoiceNexus,
+  Voice,
   createInitialVoiceState,
-} from "@shared/nexus/voice/voiceNexus";
-import { createPlainStatePort } from "@shared/nexus/kit/statePort";
+} from "@shared/collections/voice/voice";
+import { createPlainStatePort } from "@shared/collections/kit/statePort";
 import { createMemoryPersistence } from "@shared/core/persistence/createMemoryPersistence";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -28,7 +28,7 @@ it("routes every rapid action to the voice output with the persisted volume", as
     },
   );
   const storage = createMemoryPersistence();
-  const voice = new VoiceNexus(
+  const voice = new Voice(
     createPlainStatePort(createInitialVoiceState()),
     null,
     null,
@@ -39,7 +39,7 @@ it("routes every rapid action to the voice output with the persisted volume", as
     volume: 50,
   });
   voice.updateSoundSettings({ volume: 35 });
-  const restored = new VoiceNexus(
+  const restored = new Voice(
     createPlainStatePort(createInitialVoiceState()),
     null,
     null,
@@ -65,7 +65,7 @@ it("persists off and zero-volume preferences and preserves them when clearing a 
   const audio = vi.fn();
   vi.stubGlobal("Audio", audio);
   const storage = createMemoryPersistence();
-  const voice = new VoiceNexus(
+  const voice = new Voice(
     createPlainStatePort(createInitialVoiceState()),
     null,
     null,
@@ -74,7 +74,7 @@ it("persists off and zero-volume preferences and preserves them when clearing a 
   voice.updateSoundSettings({ enabled: false });
   voice.clear();
   expect(voice.getSnapshot().soundSettings.enabled).toBe(false);
-  const restored = new VoiceNexus(
+  const restored = new Voice(
     createPlainStatePort(createInitialVoiceState()),
     null,
     null,

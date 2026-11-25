@@ -1,8 +1,25 @@
 # Reporting
 
-Status: **HAV-16 design, agreed 2026-11-12. Not built yet.** The "Today"
-section describes `staging` as of that date. Everything from "Decisions" on is
-the rebuild.
+Status: **HAV-16 design, agreed 2026-11-12. The database half was built on
+2026-11-13 as part of the full database rebuild
+([DATABASE.md](./DATABASE.md#safety)); the clients and the staff site are
+not.** The "Today" section describes the system before that. Everything from
+"Decisions" on is the design.
+
+Where the built database differs from this page, the database and
+DATABASE.md are right:
+
+- Evidence stays where it is while a case holds it and is moved to the
+  private `evidence` bucket only when the case is flagged as CSAM (this page
+  says a `case-evidence` copy is made up front).
+- A suspension or ban is a row in `account_restrictions`, enforced by every
+  RPC and by an auth hook. Nothing is written to Supabase Auth.
+- Nobody handles a report about themselves: that covers moderators and
+  staff, for reading, hearing about and acting.
+- A reporter is told when their community report is closed.
+- Opening an evidence file is what unlocks it, for ten minutes, for the
+  person who opened it.
+- RPC and table names follow DATABASE.md, not the tables below.
 
 Reporting is how people tell someone that something is wrong. Haven has two
 audiences for that, and the rebuild gives each one its own table:
@@ -11,11 +28,11 @@ audiences for that, and the rebuild gives each one its own table:
    apply.
 2. **Platform cases** go to Haven staff. Haven's Terms and the law apply.
 
-## Today (being replaced)
+## Before the rebuild (replaced 2026-11)
 
 Every report starts in one of five places:
 
-| Entry                  | Clients                                                                                            | Path today                                                                                   |
+| Entry                  | Clients                                                                                            | Path then                                                                                    |
 | ---------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | Message in a community | Solid `MessageRow` → `CommunityView`; mobile `CommunityChatScreen` → `CommunityReportMessageModal` | `communityMessageNexus.report` → `communityReportBackend.reportMessage` (client inserts)     |
 | Profile                | Solid `MembersPanel`, `CommunityView`; mobile `UserProfileModal` → `ProfileReportSheet`            | `HavenCore.reportUserProfile` → `reportUserProfile` / `reportPlatformUserProfile`            |
@@ -130,9 +147,10 @@ Supporting tables:
 
 ### Media scanning slot
 
-`media_scans`: one row per uploaded attachment.
+Columns on each `media` row (`scan_status`, `scan_vendor`, `scan_detail`,
+`scanned_at`, `withheld_at`), not a table of their own.
 
-- `status`: `not_scanned` (no vendor configured), `pending`, `clear`,
+- `scan_status`: `not_scanned` (no vendor configured), `pending`, `clear`,
   `match`, `error`.
 - A `match` quarantines the object: storage RLS stops serving it, nothing
   deletes it, and the scanner opens a platform case with source `media_scan`,
@@ -168,29 +186,42 @@ tables directly.
 | Other members        | Nothing, not even a broadcast             | Nothing                                    |
 | Haven staff          | Only through the case it was escalated to | Everything, except CSAM media: see below   |
 
-- The staff site signs in as a staff user and reads through RLS. The service
-  role is for jobs only.
-- CSAM-flagged media is viewable only by staff with the `csam_reviewer` staff
-  role, and every view writes a case event.
+- The staff site signs in as a staff account, with a second factor, and reads
+  through RLS. The service role is for jobs only. A staff account does nothing
+  a person does; the staff member's own account, linked to it, carries the
+  staff badge and nothing more (DATABASE.md, "People").
+- CSAM-flagged media is viewable only by staff with `can_review_csam` set on
+  their `platform_staff` row, and every view writes a case event.
 
 ### Notices
 
-Sent through the existing `notification_events` pipeline (new kinds):
+Written by `private.notify` as ordinary notifications. The database writes
+the title and body, and both apps show them as they are in the notifications
+inbox:
 
-- **Report received**: to the reporter, when a case is filed.
-- **Outcome**: to the reporter, when a decision is recorded (`actioned` or
-  `no_action`, no detail about the other user).
-- **Statement of reasons**: to the actioned user: what was actioned, which
-  rule, and how to contact staff.
+- **Report received** (`report_received`): to the reporter, when a case is
+  filed.
+- **Outcome** (`report_outcome`): to the reporter, when a decision is recorded
+  (`actioned` or `no_action`, no detail about the other user).
+- **Statement of reasons**: to the actioned user. The `moderation_decision`
+  notice gives the rule and the reason. The `statement_of_reasons` email adds
+  what was actioned, until when, and how to contact staff (reply to the
+  email). The email is sent even if the person can no longer sign in.
 
-Community reports send no notices beyond the moderators' modmail update.
+None of these can be turned off: `set_notification_preference` refuses every
+kind but the social ones.
+
+A community report has one notice: when its moderators resolve or dismiss it,
+the reporter gets an Outcome saying it was reviewed, not what was decided.
+Everything else about it goes only to the moderators, as `report.updated`.
 
 ### Alerts and realtime
 
-- Staff are emailed for new platform cases only. A failed alert is recorded on
-  the case as an event, so it is visible, not just logged.
+- Staff are emailed for new platform cases only (the `staff_case_opened` mail
+  job). A send that keeps failing ends as a `failed` row in `private.jobs`; it
+  is not written to the case.
 - Realtime for community reports goes to the community's report readers, not
-  every member, and routes through `routeRealtimeEvent`.
+  every member, and is applied by the core's event table (REALTIME.md).
 
 ### Deletion, in one table
 
@@ -217,7 +248,7 @@ the haven-site status mapping.
 
 - **SQL**: every RLS rule, every RPC, and every deletion row above, each proven
   by breaking it.
-- **Backend contract tests**: the nexus calls against local Supabase.
+- **Backend contract tests**: the backend clients' calls against local Supabase.
 - **Real clients on the dev backend** (`docs/DEV_BACKEND.md`): a written matrix
   of every path (each report kind, escalate, each staff action, each deletion
   in the table above) run in desktop, web and mobile dev builds pointed at the
@@ -248,7 +279,7 @@ the design above provides.
 | ------------------------------------------------------------ | ---------- | ----------------------------------------------------------------------------------------------- |
 | Apple 1.2: report offensive content                          | Met        | Met                                                                                             |
 | Apple 1.2: timely response                                   | Gap        | Case age and status are queryable; staff alert per case. Response time is a practice, not code. |
-| Apple 1.2: block abusive users                               | Met        | Met (`socialNexus` blocking)                                                                    |
+| Apple 1.2: block abusive users                               | Met        | Met (`social` collection blocking)                                                              |
 | Apple 1.2: filter objectionable content                      | To confirm | Moderator removal and hiding, plus the scan slot. Confirm Apple accepts this.                   |
 | Apple 1.2: published contact information                     | Met        | Met                                                                                             |
 | 18 U.S.C. §2258A: report apparent CSAM to NCMEC              | Gap        | `staff_flag_csam` + `staff_record_ncmec_report`, logged. Needs NCMEC registration.              |

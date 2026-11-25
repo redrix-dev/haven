@@ -6,7 +6,8 @@ import { requireHavenSolidCore } from "@solid-client/core";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 import type { VoiceParticipant } from "@shared/features/voice/types";
 import type { VoiceMemberAction } from "@shared/features/voice/utils/memberControls";
-import { isVoiceTargetBelowViewer } from "@shared/features/voice/utils/memberHierarchy";
+import { outranks } from "@shared/collections/roles/selectors";
+import { memberKey } from "@shared/collections/members/members";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 
 export function VoiceParticipantCard(props: {
@@ -17,23 +18,30 @@ export function VoiceParticipantCard(props: {
   const core = requireHavenSolidCore();
   const { voice, setMemberVolume } = useVoice();
   const communityId = () => voice.activeChannel?.communityId ?? "";
-  const members = core.admin.members(communityId);
-  const roles = core.admin.roleSnapshot(communityId);
+  const community = () => core.stores.communities.byId[communityId()];
   const member = () =>
-    members().find((item) => item.userId === props.participant.userId);
-  const eligible = () =>
-    !!member() &&
-    !props.self &&
-    isVoiceTargetBelowViewer(
-      roles(),
-      core.authStore.getState().user?.id ?? "",
-      props.participant.userId,
+    core.stores.members.byKey[
+      memberKey(communityId(), props.participant.userId)
+    ];
+  // The database decides; this only hides what it would refuse.
+  const eligible = () => {
+    const shown = community();
+    return (
+      !!shown &&
+      !!member() &&
+      !props.self &&
+      outranks(
+        core.stores.roles,
+        shown,
+        core.userId ?? "",
+        props.participant.userId,
+      )
     );
+  };
   const canManage = () =>
-    eligible() &&
-    core.permissions.getPermissions(communityId()).canManageMembers;
+    eligible() && core.communities.can(communityId(), "manage_members");
   const canBan = () =>
-    eligible() && core.permissions.getPermissions(communityId()).canManageBans;
+    eligible() && core.communities.can(communityId(), "manage_bans");
   const volume = () => voice.memberVolumes[props.participant.userId] ?? 100;
   const [error, setError] = createSignal<string | null>(null);
   const [pending, setPending] = createSignal<"kick" | "ban" | null>(null);
@@ -54,12 +62,11 @@ export function VoiceParticipantCard(props: {
   const communityAction = async (reason: string) => {
     setWorking(true);
     try {
-      const input = {
-        communityId: communityId(),
-        targetUserId: props.participant.userId,
-      };
-      if (pending() === "ban") await core.admin.banMember({ ...input, reason });
-      else await core.admin.kickMember(input);
+      if (pending() === "ban") {
+        await core.members.ban(communityId(), props.participant.userId, reason);
+      } else {
+        await core.members.kick(communityId(), props.participant.userId);
+      }
       setPending(null);
     } catch (error) {
       setError(getErrorMessage(error, "Could not update this member."));

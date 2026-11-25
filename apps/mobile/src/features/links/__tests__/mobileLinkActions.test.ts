@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createLinkPipeline } from "@shared/core/linkPipeline";
-import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { DevicePersistence } from "@shared/core/persistence/DevicePersistence";
 import {
   createMobileLinkActionHandler,
   isRecoveryLink,
@@ -30,11 +30,11 @@ function fakeHandlers() {
     openCommunity: vi.fn(),
     openInvite: vi.fn(),
     openNotifications: vi.fn(),
-    refreshUrgentSurfaces: vi.fn(),
+    openFriendLink: vi.fn(),
   } satisfies MobilePushNavigationHandlers;
 }
 
-function memoryPersistence(): NexusPersistence {
+function memoryPersistence(): DevicePersistence {
   const values = new Map<string, string>();
   return {
     getString: (key) => values.get(key) ?? null,
@@ -184,6 +184,12 @@ describe("dispatchLinkIntent", () => {
     expect(handlers.openInvite).toHaveBeenCalledWith("A1B2C3D4E5");
   });
 
+  it("shows a friend link for the person to answer — it never accepts", () => {
+    const handlers = fakeHandlers();
+    dispatchLinkIntent(handlers, { kind: "friend_link", code: "K7MPQ2" });
+    expect(handlers.openFriendLink).toHaveBeenCalledWith("K7MPQ2");
+  });
+
   it("routes each destination to its screen", () => {
     const handlers = fakeHandlers();
     dispatchLinkIntent(handlers, { kind: "community", communityId: "s1" });
@@ -226,7 +232,6 @@ describe("openLinkIntent", () => {
     useMobilePushNavigationStore.setState({
       handlers: null,
       pendingLinkIntent: null,
-      pendingParsedPayload: null,
     });
   });
 

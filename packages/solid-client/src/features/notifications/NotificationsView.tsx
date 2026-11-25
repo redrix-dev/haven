@@ -1,37 +1,29 @@
-import { For, Show, onMount } from "solid-js";
+import { For, Show, createMemo, onMount } from "solid-js";
+import { useNavigate } from "@solidjs/router";
 import { Bell, Check, X } from "lucide-solid";
+import type { Notification } from "@shared/lib/backend/records";
+import { inboxNotifications } from "@shared/collections/notifications/selectors";
+import { buildHavenLinkPath, notificationIntent } from "@shared/features/links";
 import { requireHavenSolidCore } from "@solid-client/core";
-import { Avatar } from "@solid-client/components/ui";
-import {
-  getNotificationSummary,
-  getNotificationTitle,
-} from "@shared/features/notifications/notificationCopy";
-import type { NotificationItem } from "@shared/lib/backend/types";
+import { Avatar, Button } from "@solid-client/components/ui";
 
 /**
- * The notification inbox. Reads the nexus's inbox projections (which apply the
- * shared filter — DMs, friend requests and dismissed rows are excluded) and
- * drives the read / dismiss / mark-all actions on the nexus. On open it refreshes
- * the inbox and clears the server-side "unseen" badge.
+ * The inbox, newest first, as the database wrote each notification (title
+ * and body included). Opening it marks everything seen, which clears the
+ * badge; opening one marks it read and goes where it points.
  */
 export function NotificationsView() {
   const core = requireHavenSolidCore();
-  const notifications = core.notifications.inboxNotifications();
-  const unreadCount = core.notifications.inboxUnreadCount();
+  const notifications = createMemo(() =>
+    inboxNotifications(core.stores.notifications),
+  );
+  const unread = () => notifications().some((n) => n.read_at === null);
+  const inbox = () => core.stores.notifications.inbox;
 
   onMount(() => {
-    void core.notifications
-      .ensureInbox()
-      .then(() =>
-        core.notifications.markSeen(
-          notifications()
-            .filter((item) => item.seenAt == null)
-            .map((item) => item.recipientId),
-        ),
-      )
-      .catch((error) => {
-        console.warn("[NotificationsView] inbox load failed", error);
-      });
+    if (core.stores.notifications.unseen > 0) {
+      void core.notifications.mark("seen").catch(() => {});
+    }
   });
 
   return (
@@ -41,10 +33,10 @@ export function NotificationsView() {
           <Bell size={18} class="text-muted-foreground" />
           <span class="font-semibold text-foreground">Notifications</span>
         </div>
-        <Show when={unreadCount() > 0}>
+        <Show when={unread()}>
           <button
             type="button"
-            onClick={() => void core.notifications.markAllRead()}
+            onClick={() => void core.notifications.mark("read")}
             class="flex items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
           >
             <Check size={13} />
@@ -58,43 +50,58 @@ export function NotificationsView() {
           <For each={notifications()}>
             {(item) => <NotificationRow item={item} />}
           </For>
+          <Show when={inbox() && !inbox()!.atOldest}>
+            <div class="flex justify-center p-3">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void core.notifications.loadOlder()}
+              >
+                Show older
+              </Button>
+            </div>
+          </Show>
         </Show>
       </div>
     </div>
   );
 }
 
-function NotificationRow(props: { item: NotificationItem }) {
+function NotificationRow(props: { item: Notification }) {
   const core = requireHavenSolidCore();
-  const unread = () => props.item.readAt == null;
+  const navigate = useNavigate();
+  const unread = () => props.item.read_at === null;
+  const actor = () => props.item.actor_id;
+
+  const open = () => {
+    if (unread()) void core.notifications.mark("read", [props.item.id]);
+    const intent = notificationIntent(props.item);
+    if (intent && intent.kind !== "notifications") {
+      navigate(buildHavenLinkPath(intent));
+    }
+  };
 
   return (
     <div
-      class="group flex cursor-default items-start gap-3 border-b border-border px-4 py-3 transition-colors hover:bg-surface-list-hover"
-      onClick={() => {
-        if (unread()) {
-          void core.notifications.markRead([props.item.recipientId]);
-        }
-      }}
+      class="group flex cursor-pointer items-start gap-3 border-b border-border px-4 py-3 transition-colors hover:bg-surface-list-hover"
+      onClick={open}
     >
       <span
         class="mt-2 h-2 w-2 shrink-0 rounded-full"
         classList={{ "bg-primary": unread(), "bg-transparent": !unread() }}
       />
       <Avatar
-        src={props.item.actorAvatarUrl}
-        name={props.item.actorUsername ?? "Haven"}
+        src={actor() ? core.avatarUrl(actor()!) : null}
+        name={actor() ? core.nameOf(actor()!) : "Haven"}
         size="sm"
       />
       <div class="min-w-0 flex-1">
-        <p class="text-sm font-medium text-foreground">
-          {getNotificationTitle(props.item)}
-        </p>
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          {getNotificationSummary(props.item)}
-        </p>
+        <p class="text-sm font-medium text-foreground">{props.item.title}</p>
+        <Show when={props.item.body}>
+          <p class="mt-0.5 text-xs text-muted-foreground">{props.item.body}</p>
+        </Show>
         <p class="mt-1 text-[11px] text-muted-foreground">
-          {formatNotificationTime(props.item.createdAt)}
+          {formatNotificationTime(props.item.created_at)}
         </p>
       </div>
       <button
@@ -102,7 +109,7 @@ function NotificationRow(props: { item: NotificationItem }) {
         aria-label="Dismiss notification"
         onClick={(event) => {
           event.stopPropagation();
-          void core.notifications.dismiss([props.item.recipientId]);
+          void core.notifications.mark("dismissed", [props.item.id]);
         }}
         class="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:text-foreground group-hover:opacity-100"
       >

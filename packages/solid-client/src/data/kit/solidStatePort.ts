@@ -1,6 +1,6 @@
 import { batch } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
-import type { StatePort } from "@shared/nexus/kit/statePort";
+import type { StatePort } from "@shared/collections/kit/statePort";
 
 /** A state port backed by a Solid store, plus the live proxy for bindings. */
 export type SolidStatePort<S extends object> = StatePort<S> & {
@@ -17,9 +17,9 @@ export type SolidStatePort<S extends object> = StatePort<S> & {
  *
  * Reads: `get()` is the live store proxy. Shared getters such as
  * `getPermissions()` or `getSnapshot()` therefore stay reactive when a Solid
- * component or memo calls them, exactly as the per-platform nexuses did.
+ * component or memo calls them.
  *
- * Writes: shared nexus code builds a whole next value
+ * Writes: collection code builds a whole next value
  * (`{ ...entities, [id]: entry }`) and hands it to `set`. Writing that object
  * straight in would replace the store node and wake every reader of it, which
  * re-ran every open channel on every message write. Instead each key is
@@ -39,7 +39,11 @@ export type SolidStatePort<S extends object> = StatePort<S> & {
  */
 export function createSolidStatePort<S extends object>(
   initial: S,
-  options: { keys?: Partial<Record<keyof S, string>> } = {},
+  options: {
+    keys?:
+      | Readonly<Partial<Record<keyof S & string, string>>>
+      | Readonly<Record<string, string>>;
+  } = {},
 ): SolidStatePort<S> {
   const [state, setState] = createStore<S>(initial);
   // The store setter's overloads can't be indexed by a dynamic key; this is
@@ -55,7 +59,8 @@ export function createSolidStatePort<S extends object>(
     set: (partial) => {
       batch(() => {
         for (const key of Object.keys(partial) as (keyof S & string)[]) {
-          const itemKey = options.keys?.[key] ?? "id";
+          const itemKey =
+            (options.keys as Record<string, string> | undefined)?.[key] ?? "id";
           setKey(key, reconcile(partial[key] as never, { key: itemKey }));
         }
       });

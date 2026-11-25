@@ -2,103 +2,59 @@ import { useEffect, useRef } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainStackParamList } from "@/navigation/types";
-import {
-  resolveCommunityEntrypointTarget,
-  toServerSummaries,
-} from "@shared/core";
 import { perfTrace } from "@shared/debug/perfTrace";
-import {
-  applyCommunityFocus,
-  useBootstrapPhase,
-  useHavenCore,
-} from "@mobile-data";
-import {
-  useCommunitiesLoadError,
-  useCommunitiesLoading,
-  useOrderedCommunities,
-} from "@mobile-data/hooks";
-import { useAuthStore } from "@mobile-data/session/authStore";
+import { myCommunities } from "@shared/collections/communities/selectors";
+import { answered, NOT_REQUESTED } from "@shared/collections/kit/requests";
+import { useHavenCore, useStore } from "@mobile-data";
 import { getLastCommunitySurface } from "@/storage/communitySurfacePrefs";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { resolveColorProp } from "@shared/themes";
 
 type Props = NativeStackScreenProps<MainStackParamList, "CommunityEntry">;
 
+/**
+ * Where the app opens: the community the person was last in, else their
+ * first, else the community list. What the device kept shows at once; with
+ * nothing kept, it waits for the first load of the person's communities.
+ */
 export function CommunityEntry({ navigation }: Props) {
   const core = useHavenCore();
-  const bootstrapPhase = useBootstrapPhase();
-  const userId = useAuthStore((state) => state.user?.id ?? null);
-  const communities = useOrderedCommunities(core.communities);
-  const communitiesLoading = useCommunitiesLoading(core.communities);
-  const loadError = useCommunitiesLoadError(core.communities);
+  const phase = useStore("core", (s) => s.phase);
+  const communities = useStore("communities", myCommunities);
+  const mine = useStore("communities", (s) => s.requests.mine ?? NOT_REQUESTED);
+  const loaded = useStore("communities", (s) => answered(s.requests, "mine"));
   const themeTokens = useMobileThemeTokens();
   const spinnerFg = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
   const routedRef = useRef(false);
 
   useEffect(() => {
-    if (routedRef.current) return;
-    if (bootstrapPhase.phase !== "ready") return;
-    if (communitiesLoading && communities.length === 0) return;
-
+    if (routedRef.current || phase === "signed_out") return;
+    if (communities.length === 0 && !loaded) return;
     routedRef.current = true;
-    const routeToCommunity = async () => {
-      await perfTrace.measure("community-entry", async () => {
-        const servers = toServerSummaries(communities);
-        if (servers.length === 0) {
-          perfTrace.mark("community-entry.navigate", { serverId: "" });
-          navigation.replace("Community", { serverId: null, openDrawer: true });
-          return;
-        }
 
-        const activeCommunityId = core.communities.getActiveId();
-        const target = resolveCommunityEntrypointTarget({
-          activeCommunityId,
-          communityIds: servers.map((server) => server.id),
-        });
-        const targetCommunityId = target.communityId;
-
-        if (!targetCommunityId) {
-          perfTrace.mark("community-entry.navigate", { serverId: "" });
-          navigation.replace("Community", { serverId: null, openDrawer: true });
-          return;
-        }
-
-        try {
-          await core.prepareCommunityEntry(targetCommunityId);
-          await core.warmCommunitySurface(targetCommunityId);
-        } catch (error) {
-          console.warn("[CommunityEntry] prepareCommunityEntry failed", error);
-          applyCommunityFocus(core, targetCommunityId);
-        }
-
-        if (userId) {
-          await core.warmSessionSurfaces(userId);
-        }
-
-        const lastSurface = target.restoredActiveCommunity
-          ? await getLastCommunitySurface()
+    void perfTrace.measure("community-entry", async () => {
+      const place = core.stores.session.getState().place;
+      const kept =
+        place?.kind === "community" &&
+        communities.some((c) => c.id === place.community_id)
+          ? place.community_id
           : null;
-        perfTrace.mark("community-entry.navigate", {
-          serverId: targetCommunityId,
-        });
-        navigation.replace("Community", {
-          serverId: targetCommunityId,
-          openDrawer: lastSurface !== "chat",
-        });
+      const target = kept ?? communities[0]?.id ?? null;
+      if (!target) {
+        navigation.replace("Community", { serverId: null, openDrawer: true });
+        return;
+      }
+      void core.openCommunity(target);
+      const lastSurface = kept ? await getLastCommunitySurface() : null;
+      perfTrace.mark("community-entry.navigate", { serverId: target });
+      navigation.replace("Community", {
+        serverId: target,
+        openDrawer: lastSurface !== "chat",
       });
-    };
+    });
+  }, [communities, core, loaded, navigation, phase]);
 
-    void routeToCommunity();
-  }, [
-    bootstrapPhase.phase,
-    communities,
-    communitiesLoading,
-    core,
-    navigation,
-    userId,
-  ]);
-
-  if (bootstrapPhase.phase === "error" || loadError) {
+  if (mine.error && communities.length === 0) {
     return (
       <View className="flex-1 items-center justify-center gap-3 bg-surface-app px-8">
         <Text className="text-center text-base font-semibold text-foreground">
@@ -110,11 +66,7 @@ export function CommunityEntry({ navigation }: Props) {
         <Pressable
           accessibilityRole="button"
           className="rounded-xl bg-primary px-5 py-2.5 active:bg-primary-hover"
-          onPress={() => {
-            routedRef.current = false;
-            // A failed load is recorded on the communities nexus for the screen.
-            if (userId) void core.communities.load(userId).catch(() => {});
-          }}
+          onPress={() => void core.communities.loadMine()}
         >
           <Text className="font-semibold text-primary-foreground">Retry</Text>
         </Pressable>

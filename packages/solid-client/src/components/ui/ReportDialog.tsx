@@ -1,81 +1,72 @@
 import { For, Show, createEffect, createSignal } from "solid-js";
 import { X } from "lucide-solid";
 import { Button } from "./Button";
-import type {
-  MessageReportKind,
-  MessageReportTarget,
-} from "@shared/lib/backend/types";
+
+/**
+ * Who a report goes to. A report goes to one: the community's moderators,
+ * or Haven staff (who also handle anything outside a community).
+ */
+export type ReportTarget = "community" | "haven";
 
 export type ReportDialogResult = {
-  kind: MessageReportKind;
-  target: MessageReportTarget;
-  comment: string;
+  target: ReportTarget;
+  /** Empty when the person gave none and none was required. */
+  reason: string;
 };
 
-const KIND_OPTIONS: { value: MessageReportKind; label: string }[] = [
-  { value: "content_abuse", label: "Content abuse" },
-  { value: "bug", label: "Bug / platform issue" },
-];
-
-const TARGET_OPTIONS: { value: MessageReportTarget; label: string }[] = [
-  { value: "server_admins", label: "Community moderators" },
-  { value: "haven_staff", label: "Haven Platform Moderation" },
-  { value: "both", label: "Both" },
+const TARGET_OPTIONS: { value: ReportTarget; label: string }[] = [
+  { value: "community", label: "Community moderators" },
+  { value: "haven", label: "Haven staff" },
 ];
 
 /**
- * Shared report dialog for messages and user accounts.
+ * The report dialog for messages and people. Presentational: the caller's
+ * `onSubmit` files the report.
  *
- * - `showKind` — the abuse/bug picker (message reports show it; user reports
- *   don't carry a kind, so the caller hides it and ignores `result.kind`).
- * - `showTarget` — the destination picker. In a community context the reporter
- *   chooses community mods / platform / both; platform-only surfaces (DMs,
- *   non-community) hide it and the result targets `haven_staff`.
- *
- * Presentational: the caller's `onSubmit` performs the actual report.
+ * - `showTarget`: in a community the person picks who it goes to; anywhere
+ *   else it goes to Haven staff.
+ * - `reasonRequired`: a community can ask for a reason
+ *   (`report_reason_required`); the database refuses one without it.
  */
 export function ReportDialog(props: {
   open: boolean;
   title: string;
   subjectLabel?: string;
   subjectPreview?: string;
-  showKind: boolean;
   showTarget: boolean;
+  reasonRequired?: boolean;
   onClose: () => void;
   onSubmit: (result: ReportDialogResult) => Promise<void>;
 }) {
-  const [kind, setKind] = createSignal<MessageReportKind>("content_abuse");
-  const [target, setTarget] =
-    createSignal<MessageReportTarget>("server_admins");
-  const [comment, setComment] = createSignal("");
+  const [target, setTarget] = createSignal<ReportTarget>("community");
+  const [reason, setReason] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+
+  const sendsTo = (): ReportTarget => (props.showTarget ? target() : "haven");
+  const needsReason = () =>
+    sendsTo() === "community" && props.reasonRequired === true;
 
   // Reset whenever the dialog closes so the next open starts clean.
   createEffect(() => {
     if (!props.open) {
-      setKind("content_abuse");
-      setTarget(props.showTarget ? "server_admins" : "haven_staff");
-      setComment("");
+      setTarget("community");
+      setReason("");
       setSubmitting(false);
       setError(null);
     }
   });
 
   const submit = async () => {
-    const trimmed = comment().trim();
-    if (!trimmed) {
-      setError("Please add a brief reason for this report.");
+    const trimmed = reason().trim();
+    if (!trimmed && needsReason()) {
+      setError("This community asks for a reason with every report.");
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
-      await props.onSubmit({
-        kind: kind(),
-        target: props.showTarget ? target() : "haven_staff",
-        comment: trimmed,
-      });
+      await props.onSubmit({ target: sendsTo(), reason: trimmed });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to submit report.");
       setSubmitting(false);
@@ -127,31 +118,6 @@ export function ReportDialog(props: {
               </div>
             </Show>
 
-            <Show when={props.showKind}>
-              <p class="mb-2 mt-4 text-xs uppercase text-muted-foreground">
-                Type
-              </p>
-              <div class="grid gap-2">
-                <For each={KIND_OPTIONS}>
-                  {(option) => (
-                    <button
-                      type="button"
-                      class="rounded border px-3 py-2 text-left text-sm text-foreground hover:bg-surface-hover"
-                      classList={{
-                        "border-primary bg-surface-panel":
-                          kind() === option.value,
-                        "border-border-control": kind() !== option.value,
-                      }}
-                      disabled={submitting()}
-                      onClick={() => setKind(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  )}
-                </For>
-              </div>
-            </Show>
-
             <Show when={props.showTarget}>
               <p class="mb-2 mt-4 text-xs uppercase text-muted-foreground">
                 Send to
@@ -178,14 +144,14 @@ export function ReportDialog(props: {
             </Show>
 
             <p class="mb-2 mt-4 text-xs uppercase text-muted-foreground">
-              Reason
+              {needsReason() ? "Reason" : "Reason (optional)"}
             </p>
             <textarea
-              value={comment()}
+              value={reason()}
               disabled={submitting()}
               rows={3}
               placeholder="Briefly describe the problem…"
-              onInput={(e) => setComment(e.currentTarget.value)}
+              onInput={(e) => setReason(e.currentTarget.value)}
               class="w-full resize-none rounded border border-border-control bg-surface-input px-3 py-2 text-sm text-foreground outline-hidden focus:border-primary"
             />
 

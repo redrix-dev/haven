@@ -1,1 +1,0 @@
-export { ProfileSolidNexus } from "./profileSolidNexus";

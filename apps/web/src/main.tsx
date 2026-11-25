@@ -13,7 +13,7 @@ function boot(): void {
   const core = createWebHavenCore();
 
   // Dev affordance: poke the live caches from the console, e.g.
-  //   __haven.communities.getCommunityIds()
+  //   __haven.stores.communities.byId
   (window as Window & { __haven?: unknown; __havenBuild?: unknown }).__haven =
     core;
   (window as Window & { __havenBuild?: unknown }).__havenBuild = buildInfo;

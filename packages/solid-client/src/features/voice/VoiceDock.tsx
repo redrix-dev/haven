@@ -135,26 +135,15 @@ function VoiceSessionButtons(props: {
 export function VoiceDock() {
   const core = requireHavenSolidCore();
   const { voice, enableAudioPlayback } = useVoice();
-  const myId = () => core.authStore.getState().user?.id ?? "";
-  const profile = core.profiles.viewerProfile(myId);
+  const myId = () => core.userId ?? "";
   const [expanded, setExpanded] = createSignal(false);
   const [full, setFull] = createSignal(false);
   const [settings, setSettings] = createSignal(false);
   const [loadError, setLoadError] = createSignal<string | null>(null);
   let fullTrigger: HTMLButtonElement | undefined;
   let settingsTrigger: HTMLButtonElement | undefined;
-  const loadControls = () => {
-    const communityId = voice.activeChannel?.communityId;
-    if (!communityId) return;
-    setLoadError(null);
-    void Promise.all([
-      core.ensureCommunityPermissions(communityId),
-      core.admin.ensureMembersLoaded(communityId),
-      core.admin.loadRoleManagement(communityId),
-    ]).catch((error) =>
-      setLoadError(getErrorMessage(error, "Could not load member controls.")),
-    );
-  };
+  // Members, roles and permissions arrive with the community itself.
+  const loadControls = () => setLoadError(null);
   const openSettings = (element: HTMLButtonElement) => {
     settingsTrigger = element;
     setSettings(true);
@@ -166,8 +155,8 @@ export function VoiceDock() {
         full={large}
         participant={{
           userId: myId(),
-          displayName: profile()?.username ?? "You",
-          avatarUrl: profile()?.avatarUrl,
+          displayName: core.nameOf(myId(), voice.activeChannel?.communityId),
+          avatarUrl: core.avatarUrl(myId()),
           muted: voice.isMuted,
           deafened: voice.isDeafened,
           isSpeaking: voice.localSpeaking,

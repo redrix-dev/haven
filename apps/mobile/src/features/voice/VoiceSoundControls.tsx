@@ -1,11 +1,11 @@
 import { View, Text, Switch, Pressable } from "react-native";
 import { useHavenCore } from "@mobile-data";
-import { useVoiceSession } from "@mobile-data/hooks";
+import { useVoiceSession } from "@mobile-data";
 import { ThemedIonicons } from "@/theme-rn";
 
 export function VoiceSoundControls() {
   const core = useHavenCore();
-  const { soundSettings } = useVoiceSession(core.voice);
+  const { soundSettings } = useVoiceSession();
   return (
     <View className="gap-3 rounded-lg bg-surface-panel p-3">
       <View className="flex-row items-center justify-between gap-3">

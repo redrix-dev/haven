@@ -12,16 +12,14 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { createReactHavenCore } from "@/data/core";
 import { createMmkvPersistence } from "@/lib/createMmkvPersistence";
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
-import {
-  getMobileSupabase,
-  resolveMobileSupabaseConfig,
-} from "@/supabase/getMobileSupabase";
+import { getMobileSupabase } from "@/supabase/getMobileSupabase";
+import { getMobileOnboardingContext } from "@/features/onboarding/mobileOnboardingContext";
 import { useLayoutEffect, useState } from "react";
+import { AppState } from "react-native";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { applyMobileTheme } from "./src/lib/theme";
 import { loadPersistedThemeId } from "./src/storage/mobileThemePreferenceStorage";
 import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenceStore";
-import { bootstrapDataCacheDebug } from "./src/debug/bootstrapDataCacheDebug";
 import { MobileDevToolsOverlay } from "./src/dev/MobileDevToolsOverlay";
 
 perfTrace.mark("app-body-start");
@@ -29,18 +27,17 @@ registerMobileAppHost();
 perfTrace.mark("app-host-registered");
 registerGlobals();
 perfTrace.mark("livekit-globals-registered");
-bootstrapDataCacheDebug();
-
 const mobileClient = getMobileSupabase();
 perfTrace.mark("supabase-client-created");
-const mobileConfig = resolveMobileSupabaseConfig();
-createReactHavenCore({
+const core = createReactHavenCore({
   client: mobileClient,
-  publicConfig: {
-    supabaseUrl: mobileConfig.supabaseUrl,
-    supabaseAnonKey: mobileConfig.supabaseAnonKey,
-  },
   persistence: createMmkvPersistence(),
+  context: getMobileOnboardingContext(),
+});
+// Device copies are written shortly after a change; write them now when the
+// app leaves the foreground, so nothing typed is lost if it is killed.
+AppState.addEventListener("change", (state) => {
+  if (state !== "active") core.flush();
 });
 perfTrace.mark("core-created");
 

@@ -8,7 +8,7 @@ export function VoiceControlNotice({
   floating?: boolean;
 }) {
   const core = useHavenCore();
-  const { controlNotice } = useVoiceSession(core.voice);
+  const { controlNotice } = useVoiceSession();
   if (!controlNotice || controlNotice.action === "remove") return null;
   return (
     <View

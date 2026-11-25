@@ -55,7 +55,7 @@ Dependencies point **down** this table, never up, never sideways between feature
 | `App.tsx` (app) | routes, contexts, core, ui, other root files               |
 | `routes/`       | features (**index barrel only**), contexts, core, ui       |
 | `features/*`    | data, ui, contexts, auth, core — **never another feature** |
-| `contexts/`     | core, auth, data                                           |
+| `contexts/`     | core, auth, data, UI primitives                            |
 | `auth/`         | core                                                       |
 | `core/`         | data                                                       |
 | `data/`, `ui/`  | nothing above — only `@shared` and solid-js                |
@@ -211,13 +211,14 @@ subscribes to whatever that function reads on its way to the first `await`.
 This is what makes the class near-invisible in review.
 
 **A settling effect is not a defended one.** Measured when this rule landed
-(commit `1fe7693`) and again after the shared-nexus cutover: every naked effect
+(commit `1fe7693`) and again after the move to shared domain logic: every naked effect
 on the settings and community
-surfaces already settled, because the nexus's `LoadGate` made the retriggered
+surfaces already settled, because the shared `LoadGate` made the retriggered
 call join the load in flight. The defense was an implementation detail one
 dedupe away from vanishing. Judge an effect by whether it reads a store it
-writes — not by whether you can watch it misbehave. Shared nexus methods read
-the live store on Solid, so assume every `core.<domain>.*` command does.
+writes — not by whether you can watch it misbehave. Shared collection
+commands read the live store on Solid, so assume every `core.<domain>.*`
+command does.
 
 Canonical instance and the full self-check: the `haven-solid-reactivity` skill.
 Effects ship with their settle test in the same change; the test asserts the

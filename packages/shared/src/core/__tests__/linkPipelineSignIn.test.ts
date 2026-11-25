@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createLinkPipeline, PENDING_LINK_TTL_MS } from "../linkPipeline";
-import type { NexusPersistence } from "../persistence/NexusPersistence";
+import type { DevicePersistence } from "../persistence/DevicePersistence";
 import { createMemoryPersistence } from "../persistence/createMemoryPersistence";
-import { NEXUS_STORAGE_KEYS } from "../persistence/nexusStorageKeys";
+import { STORAGE_KEYS } from "../persistence/storageKeys";
 
 // openedLinkOnSignIn exists because navigation is last-call-wins: Supabase
 // reports a password sign-in (and the pipeline opens a remembered link) before
@@ -11,7 +11,7 @@ import { NEXUS_STORAGE_KEYS } from "../persistence/nexusStorageKeys";
 
 const INVITE_URL = "https://haven.redrixx.com/invite/ABCDEF0123";
 
-function setup(persistence: NexusPersistence = createMemoryPersistence()) {
+function setup(persistence: DevicePersistence = createMemoryPersistence()) {
   const clock = { now: Date.UTC(2026, 8, 15, 12) };
   const pipeline = createLinkPipeline({ persistence, now: () => clock.now });
   pipeline.setHandler(() => {});
@@ -58,7 +58,7 @@ describe("openedLinkOnSignIn", () => {
   it("is false when this build can't open the remembered link", () => {
     const persistence = createMemoryPersistence();
     persistence.set(
-      NEXUS_STORAGE_KEYS.pendingLink,
+      STORAGE_KEYS.pendingLink,
       JSON.stringify({
         v: 1,
         input: "haven://from/a/newer/build",

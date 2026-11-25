@@ -1,19 +1,13 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useHavenCore } from "@mobile-data";
-import { useProfilesRecord, useViewerProfile } from "@mobile-data/hooks";
-import {
-  resolveLiveAvatarUrl,
-  resolveLiveUsername,
-} from "@shared/lib/liveProfiles";
-import { useAuthStore } from "@mobile-data/session/authStore";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { deleteOwnAccount, signOutFromAuth } from "@/auth/mobileAuthService";
 import { ThemeVisualPickerCard } from "@/features/user-profile/ThemeVisualPickerCard";
 import AppUpdatesCard from "@/features/user-profile/AppUpdatesCard";
+import YourReportsCard from "@/features/user-profile/YourReportsCard";
 import DeleteAccountConfirmationModal from "@/features/user-profile/DeleteAccountConfirmationModal";
 import type { MainStackParamList } from "@/navigation/types";
 
@@ -21,32 +15,6 @@ type Props = NativeStackScreenProps<MainStackParamList, "Settings">;
 
 export function SettingsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const core = useHavenCore();
-  const user = useAuthStore((s) => s.user);
-  const userId = user?.id ?? null;
-
-  const viewerProfile = useViewerProfile(core.profiles, userId);
-  const liveProfiles = useProfilesRecord(core.profiles);
-
-  const identity = useMemo(() => {
-    const email = user?.email ?? null;
-    const emailLocalPart = email?.split("@")[0]?.trim() ?? "";
-    const fallbackUsername =
-      (viewerProfile?.username ?? emailLocalPart) || "User";
-    const username =
-      resolveLiveUsername(liveProfiles, userId, fallbackUsername) ??
-      fallbackUsername;
-    const avatarUrl =
-      resolveLiveAvatarUrl(
-        liveProfiles,
-        userId,
-        viewerProfile?.avatarUrl ?? null,
-      ) ??
-      viewerProfile?.avatarUrl ??
-      null;
-    return { userId, username, avatarUrl };
-  }, [liveProfiles, user?.email, userId, viewerProfile]);
-
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -121,11 +89,9 @@ export function SettingsScreen({ navigation }: Props) {
         }}
         keyboardDismissMode="interactive"
       >
-        <ThemeVisualPickerCard
-          userId={identity.userId}
-          username={identity.username}
-          avatarUrl={identity.avatarUrl}
-        />
+        <ThemeVisualPickerCard />
+
+        <YourReportsCard />
 
         <AppUpdatesCard />
 

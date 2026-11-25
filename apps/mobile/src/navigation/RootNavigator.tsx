@@ -12,7 +12,7 @@ import { SignUpScreen } from "@/screens/onboarding/SignUpScreen";
 import { useEffect, useState } from "react";
 import { getMobileSupabase } from "@/supabase/getMobileSupabase";
 import { MainNavigator } from "@/navigation/MainNavigator";
-import { MobileOnboardingGate } from "@/navigation/MobileOnboardingGate";
+import { AccountGate } from "@/navigation/AccountGate";
 import { NAV_THEME } from "@/lib/theme";
 import { useMobileLinkIntake } from "@/features/links/useMobileLinkIntake";
 
@@ -20,9 +20,9 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function AuthenticatedMain() {
   return (
-    <MobileOnboardingGate>
+    <AccountGate>
       <MainNavigator />
-    </MobileOnboardingGate>
+    </AccountGate>
   );
 }
 

@@ -10,11 +10,7 @@ import {
 } from "react-native";
 import { EnrichedMarkdownText } from "react-native-enriched-markdown";
 import { COMMUNITY_MARKDOWN_MD4C_FLAGS } from "@shared/features/messaging/utils/communityMarkdownParity";
-import type {
-  MessageAttachment,
-  MessageLinkPreview,
-} from "@shared/lib/backend/types";
-import { getFallbackEmbedUrl } from "@shared/features/messaging/utils/embedUtils";
+import type { MessageRowItem } from "@shared/features/messaging/messageViewModel";
 import { createChatMarkdownStyle } from "@/components/chat/chatTypography";
 import { useCommunityMessageColors } from "@/theme-rn";
 import { MessageImageAttachment } from "@/features/media/MessageImageAttachment";
@@ -29,28 +25,6 @@ export const CONTENT_RIGHT_PADDING = 24;
 export const CONTENT_LANE_LEFT =
   AVATAR_LEFT_INSET + AVATAR_SIZE + AVATAR_GUTTER;
 export const GROUP_WINDOW_MS = 5 * 60 * 1000;
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export type ChatMessage = {
-  id: string;
-  text: string;
-  createdAt?: string;
-  authorUserId?: string | null;
-  authorName?: string;
-  authorInitial?: string;
-  authorAvatarUrl?: string | null;
-  isAuthorStaff?: boolean;
-  timestampLabel?: string;
-  isEdited?: boolean;
-  replyTargetLabel?: string | null;
-  attachments?: MessageAttachment[];
-  linkPreview?: MessageLinkPreview | null;
-};
-
-export type ChatListItem =
-  | { kind: "message"; message: ChatMessage; isCondensed: boolean }
-  | { kind: "divider"; id: string; label: string };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -79,29 +53,30 @@ export function formatTime(timestamp: string): string {
 
 // ─── Message bubble ──────────────────────────────────────────────────────────
 
-type CommunityMessageBubbleProps = ChatMessage & {
-  isCondensed?: boolean;
+type CommunityMessageBubbleProps = {
+  item: MessageRowItem;
   onPress?: () => void;
   onPressAuthor?: () => void;
   onLongPress?: () => void;
+  onToggleReaction?: (emoji: string, on: boolean) => void;
+  /** For a message the database refused: send it again, or drop it. */
+  onRetry?: () => void;
+  onDiscard?: () => void;
 };
 
+/**
+ * One message, from the shared row (`buildMessageViewItems`), which has
+ * already worked out the author's name, colour and picture, the files' links
+ * and whether it starts a group.
+ */
 export function CommunityMessageBubble({
-  id,
-  text,
-  authorName,
-  authorInitial,
-  authorAvatarUrl,
-  isAuthorStaff,
-  timestampLabel,
-  isEdited,
-  replyTargetLabel,
-  attachments,
-  isCondensed,
+  item,
   onPress,
   onPressAuthor,
   onLongPress,
-  linkPreview,
+  onToggleReaction,
+  onRetry,
+  onDiscard,
 }: CommunityMessageBubbleProps) {
   const c = useCommunityMessageColors();
   const markdownStyle = createChatMarkdownStyle({
@@ -110,13 +85,31 @@ export function CommunityMessageBubble({
     blockquoteBorderColor: c.blockquoteAccent,
     linkColor: c.link,
   });
-  const embedUrl = linkPreview ? getFallbackEmbedUrl(linkPreview) : null;
-  const sourceUrl =
-    linkPreview?.sourceUrl ?? linkPreview?.snapshot?.sourceUrl ?? "";
-  const title = linkPreview?.snapshot?.title ?? sourceUrl;
-  const siteName = linkPreview?.snapshot?.siteName ?? "Link preview";
-  const thumbnailUrl = linkPreview?.snapshot?.thumbnail?.signedUrl ?? null;
+  const {
+    id,
+    body: text,
+    authorName,
+    avatarUrl: authorAvatarUrl,
+    authorIsStaff: isAuthorStaff,
+    edited: isEdited,
+    attachments,
+    linkPreview,
+    reactions,
+    outgoing,
+  } = item;
+  const authorInitial = authorName.trim().charAt(0).toUpperCase() || "?";
+  const timestampLabel = outgoing ? "" : formatTime(item.createdAt);
+  const replyTargetLabel = item.replyContext?.name ?? null;
+  const isCondensed = !item.showHeader;
+  const sourceUrl = linkPreview?.url ?? "";
+  const title = linkPreview?.title ?? sourceUrl;
+  const siteName = linkPreview?.site_name ?? "Link preview";
+  const thumbnailUrl = linkPreview?.imageUrl ?? null;
+  const embedUrl = linkPreview?.embed_provider ? sourceUrl : null;
   const showHeader = !isCondensed;
+  const images = attachments.filter(
+    (a) => a.mimeType.startsWith("image/") && a.url,
+  );
   const handleAuthorPress = (event: GestureResponderEvent) => {
     event.stopPropagation();
     onPressAuthor?.();
@@ -181,10 +174,13 @@ export function CommunityMessageBubble({
                 }
               >
                 <Text
-                  style={[styles.authorName, { color: c.authorName }]}
+                  style={[
+                    styles.authorName,
+                    { color: item.authorColor ?? c.authorName },
+                  ]}
                   numberOfLines={1}
                 >
-                  {authorName ?? "Unknown User"}
+                  {authorName}
                 </Text>
               </Pressable>
               {isAuthorStaff ? (
@@ -211,6 +207,12 @@ export function CommunityMessageBubble({
         {replyTargetLabel ? (
           <Text style={[styles.replyLabel, { color: c.replyLabel }]}>
             Replying to {replyTargetLabel}
+          </Text>
+        ) : null}
+
+        {item.hidden ? (
+          <Text style={[styles.replyLabel, { color: c.replyLabel }]}>
+            Hidden: the author is banned. Only moderators see this.
           </Text>
         ) : null}
 
@@ -242,8 +244,8 @@ export function CommunityMessageBubble({
           </Text>
         ) : null}
 
-        {attachments?.map((attachment) => {
-          if (!attachment.signedUrl) {
+        {attachments.map((attachment) => {
+          if (!attachment.url) {
             return (
               <Text
                 key={attachment.id}
@@ -252,37 +254,33 @@ export function CommunityMessageBubble({
                   { color: c.attachmentMuted },
                 ]}
               >
-                Attachment unavailable.
+                Loading attachment…
               </Text>
             );
           }
-          if (attachment.mediaKind === "image") {
+          if (attachment.mimeType.startsWith("image/")) {
             return (
               <MessageImageAttachment
                 key={attachment.id}
                 image={{
                   id: attachment.id,
-                  signedUrl: attachment.signedUrl,
-                  originalFilename: attachment.originalFilename,
+                  signedUrl: attachment.url,
+                  originalFilename: attachment.name,
                 }}
-                images={(attachments ?? [])
-                  .filter(
-                    (item) => item.mediaKind === "image" && item.signedUrl,
-                  )
-                  .map((item) => ({
-                    id: item.id,
-                    signedUrl: item.signedUrl!,
-                    originalFilename: item.originalFilename,
-                  }))}
+                images={images.map((image) => ({
+                  id: image.id,
+                  signedUrl: image.url!,
+                  originalFilename: image.name,
+                }))}
                 thumbnailStyle={styles.attachmentImage}
               />
             );
           }
-          if (attachment.mediaKind === "video") {
+          if (attachment.mimeType.startsWith("video/")) {
             return (
               <CommunityAttachmentVideo
                 key={attachment.id}
-                uri={attachment.signedUrl}
+                uri={attachment.url}
                 style={styles.attachmentVideo}
               />
             );
@@ -291,8 +289,7 @@ export function CommunityMessageBubble({
             <Pressable
               key={attachment.id}
               onPress={() => {
-                if (attachment.signedUrl)
-                  void Linking.openURL(attachment.signedUrl);
+                if (attachment.url) void Linking.openURL(attachment.url);
               }}
               style={[
                 styles.attachmentFileRow,
@@ -305,7 +302,7 @@ export function CommunityMessageBubble({
                   { color: c.attachmentFileLabel },
                 ]}
               >
-                {attachment.originalFilename ?? "Open attachment"}
+                {attachment.name}
               </Text>
             </Pressable>
           );
@@ -350,6 +347,57 @@ export function CommunityMessageBubble({
               </Text>
             ) : null}
           </Pressable>
+        ) : null}
+
+        {reactions.length > 0 ? (
+          <View style={styles.reactionRow}>
+            {reactions.map((reaction) => (
+              <Pressable
+                key={reaction.emoji}
+                accessibilityRole="button"
+                accessibilityState={{ selected: reaction.mine }}
+                accessibilityLabel={`${reaction.emoji} ${reaction.count}`}
+                onPress={() =>
+                  onToggleReaction?.(reaction.emoji, !reaction.mine)
+                }
+                style={[
+                  styles.reactionChip,
+                  {
+                    borderColor: reaction.mine ? c.link : c.linkPreviewBorder,
+                    backgroundColor: c.linkPreviewBg,
+                  },
+                ]}
+              >
+                <Text style={[styles.reactionText, { color: c.text }]}>
+                  {reaction.emoji} {reaction.count}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+
+        {outgoing ? (
+          outgoing.error ? (
+            <View style={styles.outgoingRow}>
+              <Text style={[styles.outgoingText, { color: c.replyLabel }]}>
+                Not sent: {outgoing.error}
+              </Text>
+              <Pressable accessibilityRole="button" onPress={onRetry}>
+                <Text style={[styles.outgoingAction, { color: c.link }]}>
+                  Retry
+                </Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={onDiscard}>
+                <Text style={[styles.outgoingAction, { color: c.timestamp }]}>
+                  Discard
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Text style={[styles.outgoingText, { color: c.timestamp }]}>
+              Sending…
+            </Text>
+          )
         ) : null}
       </View>
     </Pressable>
@@ -543,5 +591,35 @@ const styles = StyleSheet.create({
   linkPreviewHint: {
     marginTop: 8,
     fontSize: 12,
+  },
+  reactionRow: {
+    marginTop: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  reactionChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  reactionText: {
+    fontSize: 13,
+  },
+  outgoingRow: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  outgoingText: {
+    marginTop: 2,
+    fontSize: 12,
+  },
+  outgoingAction: {
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

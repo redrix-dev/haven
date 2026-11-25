@@ -47,6 +47,18 @@ const TEST_USERS = [
     password: "HavenTest!StaffInactive1",
     username: "rls_staff_inactive",
   },
+  {
+    key: "staff_person",
+    email: "rls-staff-person@example.test",
+    password: "HavenTest!StaffPerson1",
+    username: "rls_staff_person",
+  },
+  {
+    key: "stranger",
+    email: "rls-stranger@example.test",
+    password: "HavenTest!Stranger1",
+    username: "rls_stranger",
+  },
 ];
 
 async function listAllUsers(adminClient) {

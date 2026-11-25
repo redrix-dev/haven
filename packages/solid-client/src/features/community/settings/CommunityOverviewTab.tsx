@@ -1,38 +1,32 @@
-import { Show, createEffect, createSignal, untrack } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import type { ServerSettingsSnapshot } from "@shared/lib/backend/types";
+import type { Community } from "@shared/lib/backend/records";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { Button, ConfirmDialog, TextField } from "@solid-client/components/ui";
 import { requireHavenSolidCore } from "@solid-client/core";
 import { useToast } from "@solid-client/contexts/ToastProvider";
 
+/**
+ * The community's name, description and defaults, for those who may manage
+ * it; and the way out for everyone: the owner deletes it, anyone else
+ * leaves.
+ */
 export function CommunityOverviewTab(props: {
   communityId: string;
-  canManageServer: boolean;
-  isOwner: boolean;
+  onDone: () => void;
 }) {
   const core = requireHavenSolidCore();
   const navigate = useNavigate();
-  const toast = useToast();
-  const settings = core.admin.serverSettings(() => props.communityId);
-  const loading = core.admin.serverSettingsLoading(() => props.communityId);
-  const loadError = core.admin.serverSettingsError(() => props.communityId);
+  const community = () => core.stores.communities.byId[props.communityId];
+  const isOwner = () => community()?.owner_id === core.userId;
+  const canManage = () =>
+    core.communities.can(props.communityId, "manage_community");
+
   const [confirmation, setConfirmation] = createSignal<
     "leave" | "delete" | null
   >(null);
   const [actionPending, setActionPending] = createSignal(false);
   const [actionError, setActionError] = createSignal<string | null>(null);
-
-  const load = (communityId = props.communityId) => {
-    if (!communityId || !props.canManageServer) return;
-    void core.admin.loadServerSettings(communityId).catch(() => {});
-  };
-
-  createEffect(() => {
-    const communityId = props.communityId;
-    const canManageServer = props.canManageServer;
-    if (!canManageServer) return;
-    untrack(() => load(communityId));
-  });
 
   const removeCommunity = async () => {
     const action = confirmation();
@@ -41,18 +35,16 @@ export function CommunityOverviewTab(props: {
     setActionError(null);
     try {
       if (action === "delete") {
-        await core.deleteCommunity(props.communityId);
+        await core.communities.remove(props.communityId);
       } else {
-        await core.leaveCommunity(props.communityId);
+        await core.communities.leave(props.communityId);
       }
-      core.uiStore.getState().setShowServerSettingsModal(false);
+      props.onDone();
       navigate("/");
     } catch (cause) {
       setConfirmation(null);
       setActionError(
-        cause instanceof Error
-          ? cause.message
-          : `Couldn't ${action} the community.`,
+        getErrorMessage(cause, `Couldn't ${action} the community.`),
       );
     } finally {
       setActionPending(false);
@@ -66,64 +58,25 @@ export function CommunityOverviewTab(props: {
           {(message) => <ErrorBanner message={message()} />}
         </Show>
 
-        <Show when={props.canManageServer}>
-          <Show
-            when={settings()}
-            keyed
-            fallback={
-              <Show
-                when={!loading() && loadError()}
-                fallback={
-                  <div class="rounded-xl border border-border bg-card px-5 py-10 text-center text-sm text-muted-foreground">
-                    Loading community settings…
-                  </div>
-                }
-              >
-                {(message) => (
-                  <div class="rounded-xl border border-destructive/40 bg-destructive/10 p-5 text-sm text-destructive">
-                    <p>{message()}</p>
-                    <Button class="mt-4" size="sm" onClick={() => load()}>
-                      Try again
-                    </Button>
-                  </div>
-                )}
-              </Show>
-            }
-          >
-            {(snapshot) => (
-              <>
-                <GeneralSettingsForm
-                  communityId={props.communityId}
-                  settings={snapshot}
-                  onSaved={() =>
-                    toast.show({ title: "Community settings saved" })
-                  }
-                />
-                <RenameCommunityForm
-                  communityId={props.communityId}
-                  currentName={snapshot.name}
-                  onRenamed={() => toast.show({ title: "Community renamed" })}
-                />
-              </>
-            )}
-          </Show>
+        <Show when={canManage() && community()} keyed>
+          {(shown) => <GeneralSettingsForm community={shown} />}
         </Show>
 
         <section class="rounded-xl border border-destructive/40 bg-card p-5">
           <h3 class="font-semibold text-foreground">
-            {props.isOwner ? "Delete community" : "Leave community"}
+            {isOwner() ? "Delete community" : "Leave community"}
           </h3>
           <p class="mt-1 text-sm text-muted-foreground">
-            {props.isOwner
-              ? "Permanently remove this community and its content for everyone."
+            {isOwner()
+              ? "Permanently remove this community and its content for everyone. To leave it instead, hand it to another member first."
               : "Remove this community from your list. You’ll need another invite to return."}
           </p>
           <Button
             class="mt-4"
             variant="destructive"
-            onClick={() => setConfirmation(props.isOwner ? "delete" : "leave")}
+            onClick={() => setConfirmation(isOwner() ? "delete" : "leave")}
           >
-            {props.isOwner ? "Delete community" : "Leave community"}
+            {isOwner() ? "Delete community" : "Leave community"}
           </Button>
         </section>
       </div>
@@ -152,44 +105,40 @@ export function CommunityOverviewTab(props: {
   );
 }
 
-function GeneralSettingsForm(props: {
-  communityId: string;
-  settings: ServerSettingsSnapshot;
-  onSaved: () => void;
-}) {
+function GeneralSettingsForm(props: { community: Community }) {
   const core = requireHavenSolidCore();
+  const toast = useToast();
+  const [name, setName] = createSignal(props.community.name);
   const [description, setDescription] = createSignal(
-    props.settings.description ?? "",
+    props.community.description ?? "",
   );
-  const [allowPublicInvites, setAllowPublicInvites] = createSignal(
-    props.settings.allowPublicInvites,
+  const [invitesEnabled, setInvitesEnabled] = createSignal(
+    props.community.invites_enabled,
   );
-  const [requireReportReason, setRequireReportReason] = createSignal(
-    props.settings.requireReportReason,
+  const [reasonRequired, setReasonRequired] = createSignal(
+    props.community.report_reason_required,
   );
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
   const save = async () => {
+    const nextName = name().trim();
+    if (!nextName) {
+      setError("Community name is required.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      await core.saveCommunitySettings({
-        communityId: props.communityId,
-        values: {
-          name: props.settings.name,
-          description: description().trim() || null,
-          allowPublicInvites: allowPublicInvites(),
-          requireReportReason: requireReportReason(),
-        },
+      await core.communities.update(props.community.id, {
+        name: nextName,
+        description: description().trim(),
+        invites_enabled: invitesEnabled(),
+        report_reason_required: reasonRequired(),
       });
-      props.onSaved();
+      toast.show({ title: "Community settings saved" });
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Couldn't save community settings.",
-      );
+      setError(getErrorMessage(cause, "Couldn't save community settings."));
     } finally {
       setSaving(false);
     }
@@ -198,12 +147,17 @@ function GeneralSettingsForm(props: {
   return (
     <section class="rounded-xl border border-border bg-card p-5">
       <h3 class="font-semibold text-foreground">General settings</h3>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Set the community description and invitation and reporting defaults.
-      </p>
       <Show when={error()}>
         {(message) => <ErrorBanner message={message()} />}
       </Show>
+      <TextField
+        class="mt-4"
+        value={name()}
+        onChange={setName}
+        label="Name"
+        disabled={saving()}
+        required
+      />
       <label class="mt-4 flex flex-col gap-1 text-sm font-medium text-form-label">
         Description
         <textarea
@@ -216,77 +170,21 @@ function GeneralSettingsForm(props: {
         />
       </label>
       <SettingToggle
-        checked={allowPublicInvites()}
-        onChange={setAllowPublicInvites}
+        checked={invitesEnabled()}
+        onChange={setInvitesEnabled}
         disabled={saving()}
-        label="Allow public invites"
-        description="Members with invite access can create links others may redeem."
+        label="Invites work"
+        description="Off: no invite to this community can be used, old or new."
       />
       <SettingToggle
-        checked={requireReportReason()}
-        onChange={setRequireReportReason}
+        checked={reasonRequired()}
+        onChange={setReasonRequired}
         disabled={saving()}
         label="Require a report reason"
         description="Ask reporters to explain what moderators should review."
       />
       <Button class="mt-5" disabled={saving()} onClick={() => void save()}>
         {saving() ? "Saving…" : "Save settings"}
-      </Button>
-    </section>
-  );
-}
-
-function RenameCommunityForm(props: {
-  communityId: string;
-  currentName: string;
-  onRenamed: () => void;
-}) {
-  const core = requireHavenSolidCore();
-  const [name, setName] = createSignal(props.currentName);
-  const [saving, setSaving] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-
-  const rename = async () => {
-    const nextName = name().trim();
-    if (!nextName) {
-      setError("Community name is required.");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      await core.renameCommunity(props.communityId, nextName);
-      props.onRenamed();
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Couldn't rename community.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <section class="rounded-xl border border-border bg-card p-5">
-      <h3 class="font-semibold text-foreground">Community name</h3>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Choose a short name members will recognize in their community list.
-      </p>
-      <TextField
-        class="mt-4"
-        value={name()}
-        onChange={setName}
-        label="Name"
-        error={error()}
-        disabled={saving()}
-        required
-      />
-      <Button
-        class="mt-4"
-        disabled={saving() || name().trim() === props.currentName}
-        onClick={() => void rename()}
-      >
-        {saving() ? "Renaming…" : "Rename community"}
       </Button>
     </section>
   );

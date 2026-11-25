@@ -1,6 +1,6 @@
 ---
 name: haven-mobile-live-app
-description: Use when changing apps/mobile React Native or Expo code, mobile data nexuses, mobile navigation, UniWind styling, mobile native config/plugins, mobile dependencies, mobile commands, or mobile release-sensitive behavior.
+description: Use when changing apps/mobile React Native or Expo code, mobile data (HavenReactCore, store hooks), mobile navigation, UniWind styling, mobile native config/plugins, mobile dependencies, mobile commands, or mobile release-sensitive behavior.
 ---
 
 # Haven Mobile Live App
@@ -8,7 +8,7 @@ description: Use when changing apps/mobile React Native or Expo code, mobile dat
 ## Read Before Editing
 
 - [apps/mobile/README.md](../../../apps/mobile/README.md)
-- [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
+- [docs/architecture/COLLECTIONS.md](../../../docs/architecture/COLLECTIONS.md)
 - [apps/mobile/docs/uniwind-mobile.md](../../../apps/mobile/docs/uniwind-mobile.md)
 - Load [haven-mobile-chat-surface](../haven-mobile-chat-surface/SKILL.md) when
   touching chat list/composer/keyboard layout.
@@ -29,13 +29,29 @@ production-sensitive, even when the user asks for a small UI tweak.
 
 ## Data Access
 
-- Mobile constructs one `HavenReactCore` at app bootstrap.
-- UI reads domain state through `useHavenCore()` plus selector hooks from
-  `@mobile-data/hooks`.
-- UI writes call one core/cache command per gesture.
+- Mobile constructs one `HavenReactCore` at app bootstrap
+  (`apps/mobile/src/data/core/`): the shared `HavenCore` with a Zustand
+  store per collection, kept as `core.stores`.
+- UI reads through `useStore(name, select)` / `useCore(names, select)`
+  with the collections' selectors (`@shared/collections/*/selectors`), plus
+  `useMe`, `useNameOf`, `useAvatarUrl`. A selector may build a new array:
+  results are compared shallowly, so it renders only when what it read
+  changed (`coreSnapshot.ts`, tested in `data/__tests__/reactCore.test.ts`).
+- UI writes call one core or collection command per gesture.
+- An effect that opens or loads depends on ids only, never on the store state
+  its command writes; read current state inside it with
+  `core.stores.<name>.getState()`.
+- The profile sheet and the report sheet are app-wide
+  (`features/people/PeopleProvider`): `usePeople().openProfile(userId,
+communityId)` and `.report(...)`.
+- One chat for community channels and conversations:
+  `features/community/ChannelChat`, over the shared row model
+  (`@shared/features/messaging/messageViewModel`, the same one desktop
+  renders).
 - Feature code must not import backend factories, create Supabase clients, call
   RPC/table/channel APIs directly, import persistence adapters, or open domain
-  realtime subscriptions.
+  realtime subscriptions. `core.backend` is only for a read no collection
+  holds (finding a user by name, a channel's overwrites).
 - The auth boundary (`useAuthSession`, `auth/mobileAuthService`) is the bounded
   auth/session exception, not a domain-data pattern.
 - Incoming links (invites, destinations, auth emails) go through `core.links`,

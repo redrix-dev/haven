@@ -4,7 +4,20 @@ import { useBridge } from "@solid-client/contexts/BridgeProvider";
 import type { JSX } from "solid-js";
 import type { Accessor } from "solid-js";
 import type { Session } from "@supabase/supabase-js";
-import type { BootstrapPhaseSnapshot } from "@solid-client/core";
+import type { CorePhase } from "@shared/collections/core/havenCore";
+import type { AccountRestriction } from "@shared/lib/backend/records";
+import {
+  STAFF_ACCOUNT_MESSAGE,
+  isStaffAccountToken,
+} from "@shared/lib/backend/staffAccount";
+
+function restrictionNotice(
+  restriction: Pick<AccountRestriction, "ends_at">,
+): string {
+  return restriction.ends_at
+    ? `Haven staff restricted this account until ${new Date(restriction.ends_at).toLocaleString()}.`
+    : "Haven staff restricted this account.";
+}
 import {
   SolidAuthResult,
   confirmAuthLink,
@@ -16,7 +29,13 @@ import {
 } from "@solid-client/auth/solidAuthService";
 type SessionValue = {
   session: Accessor<Session | null | undefined>;
-  phase: Accessor<BootstrapPhaseSnapshot>;
+  /** signed_out, loading (what the device kept is showing), or ready. */
+  phase: Accessor<CorePhase>;
+  /**
+   * Why the app signed the account out (restricted by staff, or a staff
+   * account), shown on the sign-in screen; null otherwise.
+   */
+  signedOutNotice: Accessor<string | null>;
   /** True while a recovery email link is establishing a set-new-password session. */
   passwordRecoveryRequired: Accessor<boolean>;
   signIn: (email: string, password: string) => Promise<SolidAuthResult>;
@@ -41,7 +60,7 @@ const SessionContext = createContext<SessionValue>();
 
 export function SessionProvider(props: { children: JSX.Element }) {
   const core = requireHavenSolidCore();
-  const supabase = core.backends.client;
+  const supabase = core.client;
   // Auth emails name the client that asked; the desktop shell is the one with a
   // deep-link bridge (the page origin can't tell — see authConfirmRedirect.ts).
   const emailClient = useBridge().onDeepLink ? "desktop" : "web";
@@ -49,49 +68,41 @@ export function SessionProvider(props: { children: JSX.Element }) {
   const [session, setSession] = createSignal<Session | null | undefined>(
     undefined,
   );
-  const [phase, setPhase] = createSignal<BootstrapPhaseSnapshot>(
-    core.getBootstrapPhase(),
-  );
   const [passwordRecoveryRequired, setPasswordRecoveryRequired] =
     createSignal(false);
 
-  // Mirror the core's bootstrap phase into a signal so the UI repaints as the
-  // session marches idle → … → ready, and log every transition for the console.
-  const unsubscribePhase = core.subscribeBootstrapPhase((snapshot) => {
-    setPhase(snapshot);
-    console.log("[session] phase →", snapshot.phase, snapshot.error ?? "");
+  const phase = () => core.stores.core.phase;
+  const [signedOutNotice, setSignedOutNotice] = createSignal<string | null>(
+    null,
+  );
+
+  // Haven staff restricted the account: end the session, and say why on the
+  // sign-in screen.
+  core.listen({
+    restricted: (next) => {
+      setSignedOutNotice(restrictionNotice(next));
+      void signOutFromAuth();
+    },
   });
-  onCleanup(unsubscribePhase);
 
-  // Dedupe: Supabase fires getSession + INITIAL_SESSION + SIGNED_IN, all with
-  // the same user. Only bootstrap once per distinct user id.
-  let activeUserId: string | null = null;
-
-  const applySignIn = (userId: string) => {
-    if (activeUserId === userId) return;
-    activeUserId = userId;
-    void core.bootstrapSession(userId).catch((err) => {
-      console.warn("[session] bootstrapSession failed", err);
-    });
-  };
-
-  const applySignOut = () => {
-    activeUserId = null;
-    void core.clearSession();
-  };
-
-  // Single place that reconciles a Supabase session into our signals, the
-  // core's auth store, and the cache lifecycle.
+  // The one place a Supabase session becomes the core's session. Supabase
+  // fires getSession, INITIAL_SESSION and SIGNED_IN with the same user;
+  // signing in again as the same person is the same session.
   const sync = (next: Session | null) => {
+    // A staff account never opens the app: sign it out before anything loads.
+    if (next && isStaffAccountToken(next.access_token)) {
+      setSignedOutNotice(STAFF_ACCOUNT_MESSAGE);
+      void signOutFromAuth();
+      next = null;
+    }
     setSession(next);
-    const auth = core.authStore.getState();
-    auth.setSession(next);
-    auth.setUser(next?.user ?? null);
-    auth.setIsLoading(false);
-
     const userId = next?.user?.id ?? null;
-    if (userId) applySignIn(userId);
-    else applySignOut();
+    if (userId) {
+      setSignedOutNotice(null);
+      void core.signIn(userId);
+    } else if (core.userId !== null) {
+      core.signOut();
+    }
     // Links wait for the session to be known; signing in opens a remembered one.
     core.links.setSession(userId);
   };
@@ -148,6 +159,7 @@ export function SessionProvider(props: { children: JSX.Element }) {
   const value: SessionValue = {
     session,
     phase,
+    signedOutNotice,
     passwordRecoveryRequired,
     signIn,
     signOut,

@@ -1,32 +1,18 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { Channel } from "@shared/lib/backend/types";
-import {
-  resolvePreferredChannelIdForServer,
-  toChannel,
-  toServerSummaries,
-} from "@shared/core";
-import { applyCommunityFocus, useHavenCore } from "@mobile-data";
-import {
-  useActiveChannelId,
-  useChannels,
-  useCommunitiesLoading,
-  useOrderedCommunities,
-} from "@mobile-data/hooks";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BackHandler, View } from "react-native";
+import { myCommunities } from "@shared/collections/communities/selectors";
+import { communityChannels } from "@shared/collections/channels/selectors";
+import { answered } from "@shared/collections/kit/requests";
+import { useHavenCore, useStore } from "@mobile-data";
 import { CommunityChatScreen } from "@/screens/main/CommunityChatScreen";
-import type { UserProfileModalTarget } from "@/features/user-profile/UserProfileModal";
 import type { MainStackParamList } from "@/navigation/types";
 import { CommunityChannelDrawer } from "@/navigation/community/CommunityChannelDrawer";
 import { CommunityTopBar } from "@/navigation/community/CommunityTopBar";
-import { useDataCacheComponentProbe } from "@/debug/useDataCacheComponentProbe";
 import { CommunityRail } from "./CommunityRail";
 import { CommunityActionSheets } from "./CommunityActionSheets";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
-import { useAuthStore } from "@mobile-data/session/authStore";
-import type { VoiceSidebarParticipant } from "@shared/types/types";
 import { HavenShell, type HavenShellHandle } from "@/navigation/HavenShell";
-import { useUiStore } from "@mobile-data/session/uiStore";
 import { DmInboxDrawer } from "@/features/direct-messages/DmInboxDrawer";
 import { DmChatSurface } from "@/features/direct-messages/DmChatSurface";
 import { DmTopBar } from "@/features/direct-messages/DmTopBar";
@@ -34,32 +20,32 @@ import { DmTopBar } from "@/features/direct-messages/DmTopBar";
 type Props = NativeStackScreenProps<MainStackParamList, "Community">;
 type CommunityShellProps = Props & {
   onOpenProfile: () => void;
-  onOpenProfileCard: (target: UserProfileModalTarget) => void;
   onOpenNotifications: () => void;
   onOpenFriends: () => void;
-  onStartDirectMessage: (userId: string) => void;
   notificationsUnreadCount: number;
   inboxUnreadCount: number;
   friendRequestCount: number;
   activeVoiceChannelId: string | null;
-  voiceChannelParticipants: Record<string, VoiceSidebarParticipant[]>;
   onSelectVoiceChannel: (channelId: string) => void;
   onOpenVoiceSession: () => void;
 };
 
+/**
+ * The community surface: the rail of communities, the drawer of channels (or
+ * conversations), and the open chat. The route says which community; the
+ * session store says which channel is open there (`core.openChannel`), and
+ * opening a community goes back to the channel last open in it.
+ */
 export function CommunityShell({
   route,
   navigation,
   onOpenProfile,
-  onOpenProfileCard,
   onOpenNotifications,
   onOpenFriends,
-  onStartDirectMessage,
   notificationsUnreadCount,
   inboxUnreadCount,
   friendRequestCount,
   activeVoiceChannelId,
-  voiceChannelParticipants,
   onSelectVoiceChannel,
   onOpenVoiceSession,
 }: CommunityShellProps) {
@@ -67,41 +53,47 @@ export function CommunityShell({
   const openDrawerOnEnter = route.params?.openDrawer ?? !serverId;
   const pendingDmConversationId = route.params?.pendingDmConversationId;
   const core = useHavenCore();
-  const dm = core.directMessages;
-  const userId = useAuthStore((state) => state.user?.id ?? null);
-  const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
-
   const shellRef = useRef<HavenShellHandle>(null);
+
+  const communities = useStore("communities", myCommunities);
+  const communitiesLoaded = useStore("communities", (s) =>
+    answered(s.requests, "mine"),
+  );
+  const community = useStore("communities", (s) =>
+    serverId ? (s.byId[serverId] ?? null) : null,
+  );
+  const channels = useStore("channels", (s) =>
+    serverId ? communityChannels(s, serverId) : [],
+  );
+  const openChannelId = useStore("session", (s) =>
+    s.place?.kind === "community" && s.place.community_id === serverId
+      ? s.place.channel_id
+      : null,
+  );
 
   // ── DM mode ──────────────────────────────────────────────────────────────
   const [mode, setMode] = useState<"community" | "dm">("community");
 
-  const switchToDm = useCallback(() => {
-    setMode("dm");
-    setWorkspaceMode("dm");
-  }, [setWorkspaceMode]);
+  const switchToDm = useCallback(() => setMode("dm"), []);
 
   const switchToCommunity = useCallback(() => {
     setMode("community");
-    setWorkspaceMode("community");
+    if (serverId) void core.openCommunity(serverId);
     shellRef.current?.setDrawerOpen(false);
-  }, [setWorkspaceMode]);
+  }, [core, serverId]);
 
-  // Handle pendingDmConversationId from route params (push notifications / deep links).
+  // A conversation opened from a push or a link.
   const handledDmConversationIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!pendingDmConversationId) return;
     if (handledDmConversationIdRef.current === pendingDmConversationId) return;
     handledDmConversationIdRef.current = pendingDmConversationId;
-    void dm
-      .openConversation(pendingDmConversationId, { markRead: true })
-      .catch(() => {});
-    switchToDm();
+    void core.openConversation(pendingDmConversationId);
+    setMode("dm");
     shellRef.current?.setDrawerOpen(false);
     navigation.setParams({ pendingDmConversationId: undefined });
-  }, [pendingDmConversationId, dm, switchToDm, navigation]);
+  }, [core, navigation, pendingDmConversationId]);
 
-  // Track drawer state locally — used by the DM back handler and the debug probe.
   const [drawerOpen, setDrawerOpen] = useState(openDrawerOnEnter || !serverId);
   const [drawerGestureNonce, setDrawerGestureNonce] = useState(0);
 
@@ -114,9 +106,8 @@ export function CommunityShell({
     void setLastCommunitySurface(open ? "drawer" : "chat");
   }, []);
 
-  // Hardware back in DM mode (drawer closed) → switch back to community in-place.
-  // HavenShell's own BackHandler fires first and handles "drawer open → close drawer".
-  // This handler fires only when the drawer is already closed and we're in DM mode.
+  // Hardware back in DM mode (drawer closed) → back to the community.
+  // HavenShell's own handler closes an open drawer first.
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (mode === "dm" && !drawerOpen) {
@@ -128,141 +119,47 @@ export function CommunityShell({
     return () => sub.remove();
   }, [mode, drawerOpen, switchToCommunity]);
 
-  const setCurrentChannelId = useCallback(
-    (id: string | null) => {
-      core.channels.setActiveChannelId(id);
-    },
-    [core],
-  );
-
+  // The route's community is the one open. Only the id is a dependency:
+  // opening writes the session store, which this does not read.
   useEffect(() => {
+    if (mode !== "community") return;
     if (!serverId) {
-      core.communities.setActiveId(null);
-      core.channels.setActiveChannelId(null);
+      core.session.goHome();
       return;
     }
-    const activeCommunityId = core.communities.getActiveId();
-    const activeChannelId = core.channels.getActiveChannelId();
-    if (activeCommunityId === serverId && activeChannelId) return;
-    applyCommunityFocus(core, serverId);
-  }, [core, serverId]);
+    const place = core.stores.session.getState().place;
+    if (place?.kind === "community" && place.community_id === serverId) return;
+    void core.openCommunity(serverId);
+  }, [core, mode, serverId]);
 
-  const nexusCommunities = useOrderedCommunities(core.communities);
-  const communitiesLoading = useCommunitiesLoading(core.communities);
-  const servers = useMemo(
-    () => toServerSummaries(nexusCommunities),
-    [nexusCommunities],
-  );
-  const currentChannelId = useActiveChannelId(core.channels);
-  const havenChannels = useChannels(core.channels, serverId ?? "__empty__");
-  const channels = useMemo(() => havenChannels.map(toChannel), [havenChannels]);
-
+  // A community with no channel open opens its first text channel.
   useEffect(() => {
-    if (!serverId) return;
-    void core.channels.ensureLoaded(serverId).catch((error) => {
-      console.warn("[CommunityShell] ensureLoaded failed", error);
-    });
-    void core.ensureCommunityPermissions(serverId).catch((error) => {
-      console.warn("[CommunityShell] ensureCommunityPermissions failed", error);
-    });
-  }, [core, serverId]);
-
-  useEffect(() => {
-    if (!serverId) return;
-    if (channels.length === 0) return;
-    const valid =
-      currentChannelId != null &&
-      channels.some((channel) => channel.id === currentChannelId);
-    if (valid) return;
-    const preferred = resolvePreferredChannelIdForServer(channels, {
-      previousChannelId: currentChannelId,
-      lastChannelId: core.channels.getLastChannelId(serverId),
-      defaultChannelId: core.channels.getDefaultChannelId(serverId),
-    });
-    core.communities.setActiveId(serverId);
-    core.channels.setActiveChannelId(preferred);
-  }, [channels, core, currentChannelId, serverId]);
-
-  const currentChannel = useMemo(
-    () => channels.find((channel) => channel.id === currentChannelId) ?? null,
-    [channels, currentChannelId],
-  );
-  const currentChannelBelongsToCurrentServer = Boolean(
-    serverId && currentChannel && currentChannel.community_id === serverId,
-  );
-  const currentRenderableChannel = useMemo(
-    () =>
-      currentChannel &&
-      currentChannelBelongsToCurrentServer &&
-      currentChannel.kind === "text"
-        ? currentChannel
-        : (channels.find(
-            (channel) =>
-              channel.kind === "text" && channel.community_id === serverId,
-          ) ?? (currentChannelBelongsToCurrentServer ? currentChannel : null)),
-    [channels, currentChannel, currentChannelBelongsToCurrentServer, serverId],
-  );
-
-  const community = useMemo(
-    () => (serverId ? (servers.find((s) => s.id === serverId) ?? null) : null),
-    [serverId, servers],
-  );
-
-  useDataCacheComponentProbe("CommunityShell", {
-    routeServerId: serverId,
-    channelsCount: channels.length,
-    selectedChannelId: currentRenderableChannel?.id ?? null,
-    drawerOpen,
-    communityName: community?.name ?? null,
-  });
+    if (mode !== "community" || !serverId) return;
+    const open = channels.find((c) => c.id === openChannelId);
+    if (open?.kind === "text") return;
+    const first = channels.find((c) => c.kind === "text");
+    if (first) void core.openChannel(serverId, first.id);
+  }, [channels, core, mode, openChannelId, serverId]);
 
   // Sync drawer open state when route params (serverId / openDrawer) change.
   useEffect(() => {
-    const shouldOpen = openDrawerOnEnter || !serverId;
-    shellRef.current?.setDrawerOpen(shouldOpen);
+    shellRef.current?.setDrawerOpen(openDrawerOnEnter || !serverId);
   }, [openDrawerOnEnter, serverId]);
 
-  // Navigate to a fallback community when the current serverId disappears from the list.
+  // The route's community is gone (left, removed, deleted): go to another.
   useEffect(() => {
-    if (!serverId || communitiesLoading) return;
-    if (servers.some((server) => server.id === serverId)) return;
-
-    const fallbackId = servers[0]?.id ?? null;
-    if (fallbackId) {
-      navigation.setParams({ serverId: fallbackId, openDrawer: true });
-      void core.prepareCommunityEntry(fallbackId).catch((error) => {
-        console.warn("[CommunityShell] prepare fallback failed", error);
-        applyCommunityFocus(core, fallbackId);
-      });
-    } else {
-      core.communities.setActiveId(null);
-      core.channels.setActiveChannelId(null);
-      navigation.setParams({ serverId: null, openDrawer: true });
-    }
+    if (!serverId || !communitiesLoaded) return;
+    if (communities.some((c) => c.id === serverId)) return;
+    navigation.setParams({
+      serverId: communities[0]?.id ?? null,
+      openDrawer: true,
+    });
     shellRef.current?.setDrawerOpen(true);
-  }, [communitiesLoading, core, navigation, serverId, servers]);
+  }, [communities, communitiesLoaded, navigation, serverId]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [communityActionsOpen, setCommunityActionsOpen] = useState(false);
-  const openCommunityActions = useCallback(
-    () => setCommunityActionsOpen(true),
-    [],
-  );
-  const closeCommunityActions = useCallback(
-    () => setCommunityActionsOpen(false),
-    [],
-  );
-  const openCreateCommunity = useCallback(() => setCreateOpen(true), []);
-  const openJoinCommunity = useCallback(() => setJoinOpen(true), []);
-  const chooseCreateCommunity = useCallback(() => {
-    setCommunityActionsOpen(false);
-    setCreateOpen(true);
-  }, []);
-  const chooseJoinCommunity = useCallback(() => {
-    setCommunityActionsOpen(false);
-    setJoinOpen(true);
-  }, []);
 
   // An invite link opens the join sheet pre-filled; joining stays a tap.
   // `seq` re-fills the sheet when the same invite is opened again.
@@ -285,58 +182,37 @@ export function CommunityShell({
 
   const handleCommunityReady = useCallback(
     (communityId: string) => {
+      setMode("community");
       navigation.setParams({ serverId: communityId, openDrawer: true });
       shellRef.current?.setDrawerOpen(true);
     },
     [navigation],
   );
 
-  const handleSelectChannel = useCallback(
-    (channel: Channel) => {
-      if (!serverId) return;
-      setCurrentChannelId(channel.id);
-      shellRef.current?.setDrawerOpen(false);
-    },
-    [serverId, setCurrentChannelId],
-  );
-
   const handleSelectTextChannel = useCallback(
     (channelId: string) => {
-      const ch = channels.find((c) => c.id === channelId);
-      if (ch && ch.kind === "text") handleSelectChannel(ch);
+      if (!serverId) return;
+      void core.openChannel(serverId, channelId);
+      shellRef.current?.setDrawerOpen(false);
     },
-    [channels, handleSelectChannel],
+    [core, serverId],
   );
 
   const handleSelectCommunity = useCallback(
     (nextServerId: string) => {
-      // Always switch back to community mode when selecting a server.
-      if (mode === "dm") {
-        setMode("community");
-        setWorkspaceMode("community");
-      }
-
+      setMode("community");
       if (nextServerId === serverId) {
+        void core.openCommunity(nextServerId);
         shellRef.current?.setDrawerOpen(true);
         return;
       }
-
-      applyCommunityFocus(core, nextServerId);
-      navigation.setParams({
-        serverId: nextServerId,
-        openDrawer: true,
-      });
+      navigation.setParams({ serverId: nextServerId, openDrawer: true });
       shellRef.current?.setDrawerOpen(true);
-      void core.prepareCommunityEntry(nextServerId).catch((error) => {
-        console.warn(
-          "[CommunityShell] prepare selected community failed",
-          error,
-        );
-        applyCommunityFocus(core, nextServerId);
-      });
     },
-    [core, mode, navigation, serverId, setWorkspaceMode],
+    [core, navigation, serverId],
   );
+
+  const openChannel = channels.find((c) => c.id === openChannelId) ?? null;
 
   return (
     <View className="flex-1 bg-background">
@@ -348,7 +224,7 @@ export function CommunityShell({
         onDrawerStateChange={handleDrawerStateChange}
         rail={
           <CommunityRail
-            communities={servers}
+            communities={communities}
             activeCommunityId={serverId}
             onSelectCommunity={handleSelectCommunity}
             onOpenProfile={onOpenProfile}
@@ -359,7 +235,7 @@ export function CommunityShell({
             inboxUnreadCount={inboxUnreadCount}
             friendRequestCount={friendRequestCount}
             isDmActive={mode === "dm"}
-            onOpenCommunityActions={openCommunityActions}
+            onOpenCommunityActions={() => setCommunityActionsOpen(true)}
           />
         }
         drawerContent={
@@ -368,21 +244,17 @@ export function CommunityShell({
               onConversationSelected={() =>
                 shellRef.current?.setDrawerOpen(false)
               }
-              onStartDirectMessage={onStartDirectMessage}
             />
           ) : (
             <CommunityChannelDrawer
               serverId={serverId}
-              communityName={community?.name ?? "Communities"}
-              channels={channels}
-              selectedChannelId={currentRenderableChannel?.id ?? null}
+              selectedChannelId={openChannelId}
               activeVoiceChannelId={activeVoiceChannelId}
-              voiceChannelParticipants={voiceChannelParticipants}
               onSelectTextChannel={handleSelectTextChannel}
               onSelectVoiceChannel={onSelectVoiceChannel}
               onOpenVoiceSession={onOpenVoiceSession}
-              onCreateCommunity={openCreateCommunity}
-              onJoinCommunity={openJoinCommunity}
+              onCreateCommunity={() => setCreateOpen(true)}
+              onJoinCommunity={() => setJoinOpen(true)}
             />
           )
         }
@@ -394,9 +266,7 @@ export function CommunityShell({
           ) : serverId ? (
             <CommunityTopBar
               communityName={community?.name ?? "Communities"}
-              selectedChannelName={
-                currentRenderableChannel?.name ?? "Select channel"
-              }
+              selectedChannelName={openChannel?.name ?? "Select channel"}
               onPressCommunity={() => shellRef.current?.setDrawerOpen(true)}
               onPressChannel={() => shellRef.current?.setDrawerOpen(true)}
             />
@@ -405,11 +275,11 @@ export function CommunityShell({
         chatContent={
           mode === "dm" ? (
             <DmChatSurface />
-          ) : serverId ? (
+          ) : serverId && openChannel?.kind === "text" ? (
             <CommunityChatScreen
-              serverId={serverId}
+              communityId={serverId}
+              channelId={openChannel.id}
               drawerGestureNonce={drawerGestureNonce}
-              onOpenProfileCard={onOpenProfileCard}
             />
           ) : (
             <View className="flex-1 bg-background" />
@@ -421,10 +291,15 @@ export function CommunityShell({
         createOpen={createOpen}
         joinOpen={joinOpen}
         joinPrefill={joinPrefill}
-        userId={userId}
-        onCloseActions={closeCommunityActions}
-        onChooseCreate={chooseCreateCommunity}
-        onChooseJoin={chooseJoinCommunity}
+        onCloseActions={() => setCommunityActionsOpen(false)}
+        onChooseCreate={() => {
+          setCommunityActionsOpen(false);
+          setCreateOpen(true);
+        }}
+        onChooseJoin={() => {
+          setCommunityActionsOpen(false);
+          setJoinOpen(true);
+        }}
         onCloseCreate={() => setCreateOpen(false)}
         onCloseJoin={() => setJoinOpen(false)}
         onCommunityReady={handleCommunityReady}

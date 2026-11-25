@@ -9,13 +9,14 @@ wins and this file gets fixed in the same change. Governing mindset: [PRINCIPLES
 
 ```
 apps/
-  mobile/          React Native + Expo. LIVE on TestFlight (production target).
+  mobile/          React Native + Expo, on TestFlight.
                    Own package.json + node_modules (react is mobile-owned).
-  tauri/           Tauri v2 shell for the desktop/web rebuild (in progress).
+  tauri/           Tauri v2 desktop shell around the Solid client.
+  web/             The same Solid client as a static site (Vercel).
 packages/
-  shared/          PURE logic, types, backend clients. Zero framework, zero
-                   reactivity. Consumed by every platform.
-  solid-client/    Solid UI + Solid-native caches for desktop/web (in progress).
+  shared/          Logic, types, backend clients, the collections and HavenCore.
+                   No UI framework. Used by every platform.
+  solid-client/    Solid UI and HavenSolidCore for desktop and web.
                    Folder shape + dependency law: architecture/SOLID_CLIENT_SHAPE.md.
 supabase/          Migrations, RLS policies, Edge Functions, SQL test suites.
 tooling/           Scripts (checks, test harness, mobile ops) + test-support.
@@ -29,23 +30,24 @@ history lives in git.
 ## The three layers (the law)
 
 ```
-packages/shared (logic, nexuses, HavenCore)  →  per-platform binding  →  per-platform UI
+packages/shared (logic, collections, HavenCore)  →  per-platform stores  →  per-platform UI
 ```
 
-1. **Dependencies point inward.** Shared never imports a platform. A binding
-   never imports another platform's binding.
-2. **Logic is shared.** Fetching, merging realtime events, visibility and
-   permission filtering, pagination, event routing, domain rules, types — and
-   each domain's nexus class and the session's `HavenCore` that run them — live
-   in `packages/shared` and behave identically on every platform. No `react`, no
-   `solid-js`, no React-flavored zustand (`zustand/vanilla` is allowed). Enforced
-   by `check:shared-portable`.
-3. **Reactive memory is per-platform.** A shared nexus reads and writes through
-   a `StatePort`; the store behind it belongs to the platform's binding — a
-   Solid store in `packages/solid-client/src/data/` (`XSolidNexus`,
-   `HavenSolidCore`), a zustand store in `apps/mobile/src/data/` (`XReactNexus`,
-   `HavenReactCore`). A reactive store is **never** shared across frameworks.
-   See [architecture/HAVEN_CORE.md](./architecture/HAVEN_CORE.md).
+1. **Dependencies point inward.** Shared never imports a platform. One
+   platform never imports another's.
+2. **Logic is shared.** Fetching, applying realtime events, paging, domain
+   rules, types — and each collection and the session's `HavenCore` that run
+   them — live in `packages/shared` and behave identically on every platform.
+   No `react`, no `solid-js`, no React-flavored zustand (`zustand/vanilla` is
+   allowed). Enforced by `check:shared-portable`.
+3. **Reactive memory is per-platform.** A collection reads and writes through
+   a `StatePort`; the store behind it is the platform's, made by the core's
+   `makePort`: a Solid store for desktop and web (`HavenSolidCore`, in
+   `packages/solid-client/src/core/`), a Zustand store on the phone
+   (`HavenReactCore`, in `apps/mobile/src/data/core/`). A reactive store is
+   **never** shared across frameworks. Screens read the stores through the
+   collections' selectors and change things through commands. See
+   [architecture/COLLECTIONS.md](./architecture/COLLECTIONS.md).
 
 One sentence: _the logic is written once; each platform keeps its own memory and
 reads it its own way._
@@ -55,18 +57,17 @@ reads it its own way._
 Canonical homes — one implementation per module, no duplicate trees and no
 re-export shims:
 
-| Concern                                                            | Home                                       |
-| ------------------------------------------------------------------ | ------------------------------------------ |
-| Backend clients, RPC wrappers, network shapes                      | `lib/backend/`                             |
-| Supabase client construction                                       | `lib/createHavenSupabaseClient.ts`         |
-| Domain logic (messaging, auth, notifications, voice, …)            | `features/<domain>/`                       |
-| Session composition root (`HavenCore`)                             | `core/havenCore.ts`                        |
-| Realtime routing (pure, over `RealtimeMutationTarget`)             | `core/routeRealtimeEvent.ts`               |
-| Persistence port + memory adapter                                  | `core/persistence/`                        |
-| Nexus classes, state types, selectors, kit (StatePort, LoadGate)   | `nexus/` (recipe: `nexus/NEXUS_RECIPE.md`) |
-| Platform capability port (`AppHost`)                               | `infrastructure/platform/appHost.ts`       |
-| Themes (tokens, registry — the one place hex literals are allowed) | `themes/`                                  |
-| Shared types, DB types                                             | `types/`                                   |
+| Concern                                                            | Home                                        |
+| ------------------------------------------------------------------ | ------------------------------------------- |
+| Backend clients, RPC wrappers, network shapes                      | `lib/backend/`                              |
+| Supabase client construction                                       | `lib/createHavenSupabaseClient.ts`          |
+| Domain logic (messaging, auth, notifications, voice, …)            | `features/<domain>/`                        |
+| The session (`HavenCore`) and its event table                      | `collections/core/havenCore.ts`             |
+| Collections, their selectors, kit (StatePort, requests, events)    | `collections/` (see COLLECTIONS.md)         |
+| Device storage port + adapters; incoming links                     | `core/persistence/`, `core/linkPipeline.ts` |
+| Platform capability port (`AppHost`)                               | `infrastructure/platform/appHost.ts`        |
+| Themes (tokens, registry — the one place hex literals are allowed) | `themes/`                                   |
+| Shared types, DB types                                             | `types/`                                    |
 
 ## Platforms
 
@@ -79,13 +80,44 @@ re-export shims:
 Backend for all of them: Supabase (Auth, Postgres + RLS, Realtime, Edge Functions),
 LiveKit Cloud for voice.
 
+iOS updates its JavaScript over the air without EAS Update: a local toolchain
+(`npm run mobile:ota:deploy`, `tooling/scripts/mobile/deploy-ota.sh`) hashes the
+assets, builds the bundle and publishes it, and the `update-manifest` Edge
+Function serves the Expo Updates manifest the app checks at launch. Update
+hosting stays with the rest of the backend.
+
+## Security
+
+Every permission is decided in Postgres: an RLS policy on a table, or a check
+inside a security-definer function. The apps never decide; they show what the
+database returned. A modified client or a person with devtools gets exactly
+what the policies allow and nothing more. Channel access, ban enforcement,
+moderation visibility and who may reach whom all end there
+([architecture/DATABASE.md](./architecture/DATABASE.md)).
+
+That is why two things that look risky are safe:
+
+- **The Supabase key in the apps is public.** It is the publishable anon key,
+  and it can do only what the policies permit. The service role key never ships
+  in an app. Voice credentials live in Edge Function secrets, and
+  `voice-token` returns one only to a signed-in caller the database says may
+  join (`get_voice_access`).
+- **The source is public.** The schema, the policies, the migrations and the
+  voice function are all in this repo. A security model that only holds while
+  hidden doesn't hold.
+
+To check it yourself: the client is built in
+`packages/shared/src/lib/createHavenSupabaseClient.ts`, the policies are in
+`supabase/migrations/`, the voice secret handling is in
+`supabase/functions/voice-token/handler.ts`, and `npm run test:db` runs the
+database's own tests of who may and may not do each thing.
+
 ## Realtime (one subscription)
 
-Exactly **one** domain realtime subscription per user: `private_user:{userId}` →
-`routeRealtimeEvent` → targeted cache patch/evict/reload. Feature code never opens
-its own `postgres_changes` listener (voice room presence is the documented
-exception). Coverage matrix and open holes:
-[architecture/REALTIME.md](./architecture/REALTIME.md).
+Exactly **one** domain realtime subscription per user: `user:<id>` → the
+core's event table → the collections. Feature code never opens its own
+listener (voice presence, `voice:<channel id>`, is the documented exception).
+What each event does: [architecture/REALTIME.md](./architecture/REALTIME.md).
 
 ## Guardrails (decisions, encoded)
 
@@ -96,7 +128,7 @@ exception). Coverage matrix and open holes:
 | `mobile:ownership`                                                        | Root must not own react/expo deps; mobile must not own solid/tauri/vite                                                  | Dependency ownership mirrors the layer split                                                                |
 | `check:themes`                                                            | Theme bridge outputs match their source                                                                                  | Mobile themes are generated from shared tokens; drift = visual divergence                                   |
 | `check:chat-surface` / `check:mobile-uniwind` / `check:mobile-typography` | Mobile UI conventions                                                                                                    | Theme/typography consistency on the live app                                                                |
-| eslint boundary rules                                                     | UI/features can't import backend factories, construct Supabase clients, touch persistence, or open realtime directly     | The HavenCore → cache → UI consumer contract                                                                |
+| eslint boundary rules                                                     | UI/features can't build a backend or a Supabase client, touch device storage, or open realtime directly                  | Screens go through the core                                                                                 |
 | solid-client shape boundaries (`boundaries/dependencies`)                 | One-way layer flow inside `packages/solid-client`; features isolated + barrel-only entry; no `@tauri-apps`/react imports | The committed desktop/web shape: [architecture/SOLID_CLIENT_SHAPE.md](./architecture/SOLID_CLIENT_SHAPE.md) |
 | `mobile:bundle`                                                           | Headless Metro export resolves the whole mobile module graph                                                             | Catches broken imports/aliases in CI without a simulator                                                    |
 

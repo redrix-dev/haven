@@ -45,9 +45,10 @@ import { matchesVoicePushToTalkBinding } from "@shared/features/voice/utils/push
  * feature) because the session must outlive route changes: you stay connected
  * while browsing channels.
  *
- * Division of labor: VoiceSolidNexus owns Supabase presence/kick channels and
- * the shared session state; this provider owns the LiveKit Room and the
- * UI-facing state/actions. Mirrors mobile's split (VoiceNexus / LiveKit hook).
+ * Division of labor: the shared voice collection (`core.voice`) owns the
+ * presence channel, remote controls and the session state; this provider owns
+ * the LiveKit Room and the UI-facing state/actions. Mobile splits it the same
+ * way (`core.voice` / its LiveKit hook).
  *
  * Cross-window: the joined window broadcasts mirror state and executes
  * commands over the voiceSync BroadcastChannel (see voiceSync.ts for the
@@ -130,13 +131,23 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   const core = requireHavenSolidCore();
   const { session } = useSession();
   const userId = () => session()?.user.id ?? null;
-  const viewerProfile = core.profiles.viewerProfile(userId);
+  /** The person as voice shows them: their name and picture, from profiles. */
+  const viewerProfile = () => {
+    const id = userId();
+    const profile = id ? core.stores.profiles.byId[id] : undefined;
+    return profile
+      ? {
+          username: profile.username ?? "Member",
+          avatarUrl: core.avatarUrl(profile.id),
+        }
+      : null;
+  };
 
   const [voice, setVoice] = createStore<VoiceUiState>(initialState());
   const playVoiceCue = (event: VoiceSoundEvent) =>
     playWebVoiceSound(
       event,
-      core.voice.getSnapshot().soundSettings,
+      core.stores.voice.soundSettings,
       voice.selectedOutputDeviceId,
     );
 
@@ -499,7 +510,6 @@ export function VoiceProvider(props: { children: JSX.Element }) {
 
     try {
       const credentialsPromise = core.voice.fetchJoinCredentials(
-        channel.communityId,
         channel.channelId,
       );
       void credentialsPromise.catch(() => {});
@@ -698,7 +708,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
 
   const toggleDeafen = () => {
     const next = !voice.isDeafened;
-    // Deafening also mutes (mirrors mobile's VoiceNexus.setDeafened).
+    // Deafening also mutes (as `core.voice.setDeafened` does).
     setVoice({ isDeafened: next, isMuted: next ? true : voice.isMuted });
     core.voice.setDeafened(next);
     if (room) {
@@ -886,7 +896,7 @@ export function VoiceProvider(props: { children: JSX.Element }) {
   return (
     <VoiceContext.Provider value={value}>
       {props.children}
-      <Show when={core.voice.state.controlNotice}>
+      <Show when={core.stores.voice.controlNotice}>
         {(notice) => (
           <div
             role="status"

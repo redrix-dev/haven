@@ -37,6 +37,16 @@ export const TEST_USER_SPECS = {
     password: "HavenTest!StaffInactive1",
     username: "rls_staff_inactive",
   },
+  staff_person: {
+    email: "rls-staff-person@example.test",
+    password: "HavenTest!StaffPerson1",
+    username: "rls_staff_person",
+  },
+  stranger: {
+    email: "rls-stranger@example.test",
+    password: "HavenTest!Stranger1",
+    username: "rls_stranger",
+  },
 } as const;
 
 export type TestUserKey = keyof typeof TEST_USER_SPECS;

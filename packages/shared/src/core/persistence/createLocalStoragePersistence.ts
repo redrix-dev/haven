@@ -1,12 +1,12 @@
-import type { NexusPersistence } from "./NexusPersistence";
+import type { DevicePersistence } from "./DevicePersistence";
 
-const STORAGE_PREFIX = "haven:nexus:";
+const STORAGE_PREFIX = "haven:";
 
 /**
- * Browser localStorage adapter for NexusPersistence.
+ * Browser localStorage adapter for DevicePersistence.
  * Used by Tauri (webview) and web builds. Keys are prefixed to avoid collisions.
  */
-export function createLocalStoragePersistence(): NexusPersistence {
+export function createLocalStoragePersistence(): DevicePersistence {
   const storage =
     typeof globalThis !== "undefined" &&
     "localStorage" in globalThis &&
@@ -31,7 +31,7 @@ export function createLocalStoragePersistence(): NexusPersistence {
       try {
         storage.setItem(prefixed(key), value);
       } catch (error) {
-        console.warn("[NexusPersistence] localStorage set failed", error);
+        console.warn("[DevicePersistence] localStorage set failed", error);
       }
     },
     remove(key) {
@@ -39,7 +39,7 @@ export function createLocalStoragePersistence(): NexusPersistence {
       try {
         storage.removeItem(prefixed(key));
       } catch (error) {
-        console.warn("[NexusPersistence] localStorage remove failed", error);
+        console.warn("[DevicePersistence] localStorage remove failed", error);
       }
     },
   };

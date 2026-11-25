@@ -1,36 +1,14 @@
-import { useCallback } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ThemedIonicons } from "@/theme-rn";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useUiStore } from "@mobile-data/session/uiStore";
-import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
 import NotificationsContainer from "@/features/notifications/NotificationsContainer";
-import type { NotificationsFriendsPanelOpenInput } from "@/features/notifications/NotificationsContainer";
 import type { MainStackParamList } from "@/navigation/types";
 
 type Props = NativeStackScreenProps<MainStackParamList, "Notifications">;
 
 export function NotificationsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-
-  useFocusEffect(
-    useCallback(() => {
-      useUiStore.getState().setNotificationsPanelOpen(true);
-      return () => {
-        useUiStore.getState().setNotificationsPanelOpen(false);
-      };
-    }, []),
-  );
-
-  const handleOpenFriendsPanel = useCallback(
-    (input: NotificationsFriendsPanelOpenInput) => {
-      useMobilePushNavigationStore.getState().handlers?.openFriends(input);
-    },
-    [],
-  );
-
   return (
     <View className="flex-1 bg-background">
       <View
@@ -57,7 +35,7 @@ export function NotificationsScreen({ navigation }: Props) {
         </View>
       </View>
       <View className="flex-1 p-4">
-        <NotificationsContainer onOpenFriendsPanel={handleOpenFriendsPanel} />
+        <NotificationsContainer />
       </View>
     </View>
   );

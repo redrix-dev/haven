@@ -1,4 +1,4 @@
-import type { NexusPersistence } from "@shared/core/persistence/NexusPersistence";
+import type { DevicePersistence } from "@shared/core/persistence/DevicePersistence";
 import { perfTrace } from "./perfTrace";
 
 /**
@@ -7,7 +7,7 @@ import { perfTrace } from "./perfTrace";
  * Reads and the storage write itself are timed by `tracePersistence`.
  */
 export function tracePersist(
-  persistence: NexusPersistence,
+  persistence: DevicePersistence,
   key: string,
   value: unknown,
 ): void {
@@ -26,7 +26,7 @@ export function tracePersist(
  * Times get/set on the storage port. Fast operations stay in the summary
  * counters. A call of 8ms or more is also its own span.
  */
-export function tracePersistence(inner: NexusPersistence): NexusPersistence {
+export function tracePersistence(inner: DevicePersistence): DevicePersistence {
   return {
     getString(key) {
       if (!perfTrace.isEnabled()) return inner.getString(key);

@@ -1,210 +1,152 @@
+// What every Haven Edge Function shares: the two kinds of database client, the
+// worker secret check, and plain JSON replies.
+
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+
+export type Db = SupabaseClient;
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-haven-cron-secret",
+    "authorization, x-client-info, apikey, content-type",
 } as const;
 
-export const UUID_V4_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export const isUuid = (value: unknown): value is string =>
-  typeof value === "string" && UUID_V4_PATTERN.test(value);
-
-export const jsonResponse = (
+export function json(
   body: unknown,
   status = 200,
-  headers?: HeadersInit,
-) =>
-  new Response(JSON.stringify(body), {
+  headers: HeadersInit = {},
+): Response {
+  return new Response(JSON.stringify(body), {
     status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-      ...(headers ?? {}),
-    },
+    headers: { "content-type": "application/json", ...headers },
   });
+}
 
-export const okOptionsResponse = () =>
-  new Response("ok", { headers: corsHeaders });
+/** A setting from the function's environment; null when unset or blank. */
+export function env(name: string): string | null {
+  const value = Deno.env.get(name)?.trim();
+  return value ? value : null;
+}
 
-export const requireSupabaseEnv = () => {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+export function requireEnv(name: string): string {
+  const value = env(name);
+  if (!value) throw new Error(`${name} is not set`);
+  return value;
+}
 
-  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
-    throw new Error(
-      "Supabase env is not configured (SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY).",
+const noSession = {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+} as const;
+
+/** The service role: for workers only. It skips RLS. */
+export function serviceDb(): Db {
+  return createClient(
+    requireEnv("SUPABASE_URL"),
+    requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    noSession,
+  );
+}
+
+/**
+ * The database as the person who called this function: their token is passed
+ * on, so every RPC sees them and applies the same rules as in the apps. Null
+ * when the request carries no token.
+ */
+export function callerDb(req: Request): Db | null {
+  const authorization = req.headers.get("authorization") ?? "";
+  if (!/^bearer\s+\S+$/i.test(authorization.trim())) return null;
+  return createClient(
+    requireEnv("SUPABASE_URL"),
+    requireEnv("SUPABASE_ANON_KEY"),
+    {
+      ...noSession,
+      global: { headers: { Authorization: authorization.trim() } },
+    },
+  );
+}
+
+/** Calls an RPC and returns its result, or throws with the function's name. */
+export async function call<T>(
+  db: Db,
+  fn: string,
+  args: Record<string, unknown>,
+): Promise<T> {
+  const { data, error } = await db.rpc(fn, args);
+  if (error) throw new Error(`${fn}: ${error.message}`);
+  return data as T;
+}
+
+function sameText(a: string, b: string): boolean {
+  // Compares every character whatever the result, so the time taken says
+  // nothing about how much of a guess was right.
+  let difference = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+    difference |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return difference === 0;
+}
+
+/**
+ * True when the request carries the worker secret. The database sends it in
+ * `x-haven-worker-secret` (see private.wake_worker); the function knows it as
+ * HAVEN_WORKER_CRON_SECRET. With no secret configured nothing is let in.
+ */
+export function isWorkerCall(req: Request): boolean {
+  const expected = env("HAVEN_WORKER_CRON_SECRET");
+  if (!expected || expected.length < 16) return false;
+  return sameText(expected, req.headers.get("x-haven-worker-secret") ?? "");
+}
+
+export function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** For functions the apps call from a browser or webview. */
+export function reply(body: unknown, status = 200): Response {
+  return json(body, status, corsHeaders);
+}
+
+// The database's refusals (docs/architecture/DATABASE.md, "Errors"), plus the
+// API's own answers to a missing or expired token.
+const STATUS_BY_CODE: Record<string, number> = {
+  PT401: 401,
+  PGRST301: 401,
+  PGRST302: 401,
+  PGRST303: 401,
+  "42501": 403,
+  PT404: 404,
+  PT409: 409,
+  PT429: 429,
+  "22023": 400,
+};
+
+/**
+ * Passes a database refusal on to the caller unchanged: the same status, the
+ * same sentence, the same reason word. Anything that is not a refusal is a
+ * fault and says nothing about itself.
+ */
+export function refusal(error: {
+  code?: string;
+  message: string;
+  details?: string | null;
+}): Response {
+  const status = STATUS_BY_CODE[error.code ?? ""];
+  if (!status) {
+    console.error(`database error ${error.code ?? "?"}: ${error.message}`);
+    return reply(
+      { reason: "server_error", message: "Something went wrong." },
+      500,
     );
   }
-
-  return {
-    supabaseUrl,
-    supabaseAnonKey,
-    serviceRoleKey,
-  };
-};
-
-export const createAnonAuthClient = (supabaseUrl: string, anonKey: string) =>
-  createClient(supabaseUrl, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
-
-export const createServiceClient = (
-  supabaseUrl: string,
-  serviceRoleKey: string,
-) =>
-  createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
-
-export const createUserScopedClient = (
-  supabaseUrl: string,
-  anonKey: string,
-  token: string,
-) =>
-  createClient(supabaseUrl, anonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  });
-
-const decodeBase64UrlJson = (value: string): Record<string, unknown> | null => {
-  try {
-    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-    const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
-    const decoded = atob(normalized + padding);
-    const parsed = JSON.parse(decoded);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
-};
-
-const extractJwtSubject = (token: string): string | null => {
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  const payload = decodeBase64UrlJson(parts[1]);
-  const sub = payload?.sub;
-  return typeof sub === "string" && sub.trim().length > 0 ? sub : null;
-};
-
-export const extractBearerToken = (req: Request): string | null => {
-  const authorization =
-    req.headers.get("authorization") ?? req.headers.get("Authorization") ?? "";
-  const bearerPrefix = "bearer ";
-  if (!authorization.toLowerCase().startsWith(bearerPrefix)) return null;
-  const token = authorization.slice(bearerPrefix.length).trim();
-  return token.length > 0 ? token : null;
-};
-
-export const getCronSecretHeader = (req: Request): string | null => {
-  const value = req.headers.get("x-haven-cron-secret")?.trim();
-  return value && value.length > 0 ? value : null;
-};
-
-export const verifyCronSecret = (req: Request): boolean => {
-  const expected = Deno.env.get("HAVEN_WORKER_CRON_SECRET");
-  if (!expected) return false;
-  const provided = getCronSecretHeader(req);
-  return Boolean(provided && provided === expected);
-};
-
-export const authenticateUser = async (
-  req: Request,
-): Promise<{
-  token: string;
-  userId: string;
-  anonClient: SupabaseClient;
-  userClient: SupabaseClient;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-}> => {
-  const token = extractBearerToken(req);
-  if (!token) {
-    throw new Error("Missing bearer token");
-  }
-
-  const { supabaseUrl, supabaseAnonKey } = requireSupabaseEnv();
-  const anonClient = createAnonAuthClient(supabaseUrl, supabaseAnonKey);
-  const {
-    data: { user },
-    error,
-  } = await anonClient.auth.getUser(token);
-
-  if (error || !user?.id) {
-    throw new Error("Invalid JWT");
-  }
-
-  return {
-    token,
-    userId: user.id,
-    anonClient,
-    userClient: createUserScopedClient(supabaseUrl, supabaseAnonKey, token),
-    supabaseUrl,
-    supabaseAnonKey,
-  };
-};
-
-// Use only for functions deployed with verify_jwt = true. The Edge gateway has already validated
-// the token signature/expiry, so this avoids a second auth.getUser(token) round-trip that can race
-// immediately after sign-in.
-export const authenticateGatewayVerifiedUser = async (
-  req: Request,
-): Promise<{
-  token: string;
-  userId: string;
-  anonClient: SupabaseClient;
-  userClient: SupabaseClient;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-}> => {
-  const token = extractBearerToken(req);
-  if (!token) {
-    throw new Error("Missing bearer token");
-  }
-
-  const { supabaseUrl, supabaseAnonKey } = requireSupabaseEnv();
-  const userId = extractJwtSubject(token);
-  if (!userId) {
-    throw new Error("Invalid JWT");
-  }
-
-  return {
-    token,
-    userId,
-    anonClient: createAnonAuthClient(supabaseUrl, supabaseAnonKey),
-    userClient: createUserScopedClient(supabaseUrl, supabaseAnonKey, token),
-    supabaseUrl,
-    supabaseAnonKey,
-  };
-};
-
-export const parseJsonBody = async <T = unknown>(
-  req: Request,
-): Promise<T | null> => {
-  try {
-    return (await req.json()) as T;
-  } catch {
-    return null;
-  }
-};
+  return reply(
+    { reason: error.details ?? "refused", message: error.message },
+    status,
+  );
+}

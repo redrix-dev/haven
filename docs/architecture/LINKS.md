@@ -70,7 +70,7 @@ screen; joining stays a human click.
 What it guarantees:
 
 - **A remembered link survives sign-in, sign-up and app restarts.** Stored raw
-  under `NEXUS_STORAGE_KEYS.pendingLink` and re-parsed when it drains, so an
+  under `STORAGE_KEYS.pendingLink` and re-parsed when it drains, so an
   updated app applies current rules. Latest wins, removed before it runs (at
   most once), expires after 7 days (`PENDING_LINK_TTL_MS`).
 - **One click means one action.** A repeated `event` within 5 seconds

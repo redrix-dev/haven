@@ -6,7 +6,7 @@ import { Button, TextField } from "@solid-client/components/ui";
 
 export function SignInScreen() {
   const core = requireHavenSolidCore();
-  const { signIn } = useSession();
+  const { signIn, signedOutNotice } = useSession();
   // useNavigate() gives us a function to push a new route programmatically.
   // We call navigate("/") after a successful sign-in so the auth guard in
   // AppLayout takes over and renders the app.
@@ -29,6 +29,9 @@ export function SignInScreen() {
           : String(result.error),
       );
       setBusy(false);
+    } else if (signedOutNotice()) {
+      // Signed straight back out (a staff account); the notice says why.
+      setBusy(false);
     } else {
       // Don't clear busy — we stay in the "loading" state while the router
       // transitions. Supabase reports the sign-in before signIn() resolves, so
@@ -42,6 +45,15 @@ export function SignInScreen() {
     <div class="flex h-full w-full items-center justify-center bg-background">
       <div class="w-full max-w-sm rounded-xl bg-card p-8 shadow-lg">
         <h1 class="mb-6 text-xl font-bold text-foreground">Sign in to Haven</h1>
+
+        <Show when={signedOutNotice()}>
+          <p
+            role="status"
+            class="mb-4 rounded-md bg-muted p-3 text-sm text-foreground"
+          >
+            {signedOutNotice()}
+          </p>
+        </Show>
 
         <form onSubmit={submit} class="flex flex-col gap-4">
           <TextField

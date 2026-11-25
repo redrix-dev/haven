@@ -11,41 +11,63 @@ type MessageActionsSheetProps = {
   onClose: () => void;
   target: MessageActionTarget | null;
   communityName: string;
+  canReply: boolean;
   canCopy: boolean;
   canEdit: boolean;
   canDelete: boolean;
   canReport: boolean;
-  canKick: boolean;
-  canBan: boolean;
+  /** Emoji offered as one-tap reactions. Tapping one you used takes it back. */
+  quickReactions: readonly string[];
+  onReact: (emoji: string) => void;
   onReply: () => void;
   onCopy: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onReport: () => void;
-  onKick: () => void;
-  onBan: () => void;
 };
 
+/** What can be done to one message, from a long press. */
 export function MessageActionsSheet({
   visible,
   onClose,
   target,
   communityName,
+  canReply,
   canCopy,
   canEdit,
   canDelete,
   canReport,
-  canKick,
-  canBan,
+  quickReactions,
+  onReact,
   onReply,
   onCopy,
   onEdit,
   onDelete,
   onReport,
-  onKick,
-  onBan,
 }: MessageActionsSheetProps) {
   if (!target) return null;
+
+  const row = (
+    label: string,
+    onPress: () => void,
+    tone: "default" | "destructive" = "default",
+  ) => (
+    <Pressable
+      className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
+      onPress={() => {
+        onPress();
+        onClose();
+      }}
+    >
+      <Text
+        className={`text-center text-base font-medium ${
+          tone === "destructive" ? "text-destructive" : "text-foreground"
+        }`}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
 
   return (
     <Modal
@@ -66,95 +88,27 @@ export function MessageActionsSheet({
           >
             {communityName}
           </Text>
-          <Pressable
-            className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
-            onPress={() => {
-              onReply();
-              onClose();
-            }}
-          >
-            <Text className="text-center text-base font-medium text-foreground">
-              Reply
-            </Text>
-          </Pressable>
-          {canCopy ? (
-            <Pressable
-              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
-              onPress={() => {
-                onCopy();
-                onClose();
-              }}
-            >
-              <Text className="text-center text-base font-medium text-foreground">
-                Copy text
-              </Text>
-            </Pressable>
-          ) : null}
-          {canEdit ? (
-            <Pressable
-              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
-              onPress={() => {
-                onEdit();
-                onClose();
-              }}
-            >
-              <Text className="text-center text-base font-medium text-foreground">
-                Edit
-              </Text>
-            </Pressable>
-          ) : null}
-          {canDelete ? (
-            <Pressable
-              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
-              onPress={() => {
-                onDelete();
-                onClose();
-              }}
-            >
-              <Text className="text-center text-base font-medium text-destructive">
-                Delete
-              </Text>
-            </Pressable>
-          ) : null}
-          {canReport ? (
-            <Pressable
-              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
-              onPress={() => {
-                onReport();
-                onClose();
-              }}
-            >
-              <Text className="text-center text-base font-medium text-foreground">
-                Report
-              </Text>
-            </Pressable>
-          ) : null}
-          {canKick ? (
-            <Pressable
-              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
-              onPress={() => {
-                onKick();
-                onClose();
-              }}
-            >
-              <Text className="text-center text-base font-medium text-orange-400">
-                Kick from community
-              </Text>
-            </Pressable>
-          ) : null}
-          {canBan ? (
-            <Pressable
-              className="mb-2 rounded-xl bg-surface-panel py-3.5 active:opacity-90"
-              onPress={() => {
-                onBan();
-                onClose();
-              }}
-            >
-              <Text className="text-center text-base font-medium text-destructive">
-                Ban user
-              </Text>
-            </Pressable>
-          ) : null}
+          <View className="mb-3 flex-row justify-between">
+            {quickReactions.map((emoji) => (
+              <Pressable
+                key={emoji}
+                accessibilityRole="button"
+                accessibilityLabel={`React ${emoji}`}
+                className="h-11 w-11 items-center justify-center rounded-full bg-surface-panel active:opacity-80"
+                onPress={() => {
+                  onReact(emoji);
+                  onClose();
+                }}
+              >
+                <Text className="text-xl">{emoji}</Text>
+              </Pressable>
+            ))}
+          </View>
+          {canReply ? row("Reply", onReply) : null}
+          {canCopy ? row("Copy text", onCopy) : null}
+          {canEdit ? row("Edit", onEdit) : null}
+          {canDelete ? row("Delete", onDelete, "destructive") : null}
+          {canReport ? row("Report", onReport) : null}
           <Pressable
             className="mt-1 rounded-xl py-3 active:opacity-90"
             onPress={onClose}

@@ -1,1 +1,0 @@
-export { PermissionsSolidNexus } from "./permissionsSolidNexus";

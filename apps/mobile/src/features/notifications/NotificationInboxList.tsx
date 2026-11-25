@@ -1,287 +1,139 @@
-/**
- * Swipe actions: dismiss + mark read only. There is no `mark_notifications_unread` RPC yet (Phase B),
- * so we do not expose “Mark unread” in the UI.
- */
-import { useCallback, useMemo, useState } from "react";
+import { FlatList, Image, Pressable, Text, View } from "react-native";
+import type { Notification } from "@shared/lib/backend/records";
+import { inboxNotifications } from "@shared/collections/notifications/selectors";
+import { notificationIntent } from "@shared/features/links";
+import { useAvatarUrl, useHavenCore, useNameOf, useStore } from "@mobile-data";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  Text,
-  View,
-  type ListRenderItem,
-} from "react-native";
-import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+  dispatchLinkIntent,
+  useMobilePushNavigationStore,
+} from "@/stores/mobilePushNavigationStore";
 import { ThemedIonicons } from "@/theme-rn";
-import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
-import type { NotificationItem } from "@shared/lib/backend/types";
-import {
-  getNotificationSummary,
-  getNotificationTitle,
-} from "@shared/features/notifications/notificationCopy";
-import {
-  resolveLiveAvatarUrl,
-  resolveLiveUsername,
-} from "@shared/lib/liveProfiles";
-import { filterNotificationsForInbox } from "@shared/features/notifications/inboxNotificationFilter";
-import { useHavenCore } from "@mobile-data";
-import {
-  useNotifications,
-  useNotificationsLoading,
-  useProfilesRecord,
-} from "@mobile-data/hooks";
-import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
-import { resolveColorProp } from "@shared/themes";
 
-function formatShortTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.valueOf())) return iso;
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-type NotificationInboxListProps = {
-  navigationError?: string | null;
-  onNavigate: (notification: NotificationItem) => void | Promise<void>;
-};
-
-export function NotificationInboxList({
-  navigationError,
-  onNavigate,
-}: NotificationInboxListProps) {
+/**
+ * The inbox, newest first, as the database wrote each notification (title
+ * and body included). Opening one marks it read and goes where it points,
+ * the same place a push tap would.
+ */
+export function NotificationInboxList() {
   const core = useHavenCore();
-  const themeTokens = useMobileThemeTokens();
-  const foregroundColor =
-    resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
-  const notificationItems = useNotifications(core.notifications);
-  const items = useMemo(
-    () => filterNotificationsForInbox(notificationItems),
-    [notificationItems],
+  const notifications = useStore("notifications", inboxNotifications);
+  const inbox = useStore("notifications", (s) => s.inbox);
+  const refreshing = useStore(
+    "notifications",
+    (s) => s.requests.inbox?.running ?? false,
   );
-  const liveProfiles = useProfilesRecord(core.profiles);
-  const loading = useNotificationsLoading(core.notifications);
-  const [refreshing, setRefreshing] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-
-  const withNotificationAction = useCallback(
-    async (action: () => Promise<void>) => {
-      setActionError(null);
-      try {
-        await action();
-      } catch (err) {
-        setActionError(getErrorMessage(err, "Failed to update notifications."));
-      }
-    },
-    [],
-  );
-
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    setActionError(null);
-    await withNotificationAction(() => core.notifications.loadInbox());
-    setRefreshing(false);
-  }, [core.notifications, withNotificationAction]);
-
-  const dismiss = useCallback(
-    (recipientId: string) => {
-      void withNotificationAction(() =>
-        core.notifications.dismiss([recipientId]),
-      );
-    },
-    [core.notifications, withNotificationAction],
-  );
-
-  const markRead = useCallback(
-    (recipientId: string) => {
-      void withNotificationAction(() =>
-        core.notifications.markRead([recipientId]),
-      );
-    },
-    [core.notifications, withNotificationAction],
-  );
-
-  const toggleExpanded = useCallback((recipientId: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(recipientId)) next.delete(recipientId);
-      else next.add(recipientId);
-      return next;
-    });
-  }, []);
-
-  const visibleError = actionError ?? navigationError ?? null;
-
-  const renderRightActions = useCallback(
-    (notification: NotificationItem) => {
-      const unread = notification.readAt == null;
-      return (
-        <View className="flex-row">
-          {unread ? (
-            <Pressable
-              accessibilityRole="button"
-              className="w-24 items-center justify-center bg-primary"
-              onPress={() => markRead(notification.recipientId)}
-            >
-              <Text className="text-center text-sm font-semibold text-primary-foreground">
-                Read
-              </Text>
-            </Pressable>
-          ) : null}
-          <Pressable
-            accessibilityRole="button"
-            className="w-24 items-center justify-center bg-destructive/90"
-            onPress={() => dismiss(notification.recipientId)}
-          >
-            <Text className="text-center text-sm font-semibold text-primary-foreground">
-              Dismiss
-            </Text>
-          </Pressable>
-        </View>
-      );
-    },
-    [dismiss, markRead],
-  );
-
-  const renderItem: ListRenderItem<NotificationItem> = useCallback(
-    ({ item }) => {
-      const expanded = expandedIds.has(item.recipientId);
-      const actorLabel =
-        resolveLiveUsername(
-          liveProfiles,
-          item.actorUserId,
-          item.actorUsername,
-        )?.trim() ||
-        item.actorUserId ||
-        "System";
-      const avatarUrl = resolveLiveAvatarUrl(
-        liveProfiles,
-        item.actorUserId,
-        item.actorAvatarUrl,
-      );
-      const initial = actorLabel.trim().charAt(0).toUpperCase() || "N";
-      const title = getNotificationTitle(item);
-      const summary = getNotificationSummary(item);
-      const unread = item.readAt == null;
-
-      return (
-        <ReanimatedSwipeable
-          renderRightActions={() => renderRightActions(item)}
-          overshootRight={false}
-        >
-          <View className="border-b border-border-panel bg-card py-3">
-            <Pressable
-              onPress={() => toggleExpanded(item.recipientId)}
-              className="active:bg-surface-hover"
-              accessibilityRole="button"
-            >
-              <View className="flex-row gap-3">
-                <View className="h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
-                  {avatarUrl ? (
-                    <Image
-                      source={{ uri: avatarUrl }}
-                      style={{ width: 40, height: 40 }}
-                      resizeMode="cover"
-                      accessibilityIgnoresInvertColors
-                    />
-                  ) : (
-                    <Text className="text-lg font-semibold text-foreground">
-                      {initial}
-                    </Text>
-                  )}
-                </View>
-                <View className="min-w-0 flex-1">
-                  <View className="flex-row items-start justify-between gap-2">
-                    <Text
-                      className={`shrink text-base ${unread ? "font-semibold text-foreground" : "text-muted-foreground"}`}
-                      numberOfLines={expanded ? undefined : 1}
-                    >
-                      {title}
-                    </Text>
-                    <Text className="text-xs text-muted-foreground">
-                      {formatShortTime(item.createdAt)}
-                    </Text>
-                  </View>
-                  <Text
-                    className="text-xs text-muted-foreground"
-                    numberOfLines={1}
-                  >
-                    {actorLabel}
-                  </Text>
-                  <Text
-                    className={`mt-1 text-sm ${unread ? "text-foreground" : "text-muted-foreground"}`}
-                    numberOfLines={expanded ? undefined : 2}
-                  >
-                    {summary}
-                  </Text>
-                </View>
-              </View>
-            </Pressable>
-            {expanded ? (
-              <Pressable
-                accessibilityRole="button"
-                className="mt-3 self-start rounded-lg bg-primary px-3 py-2 active:bg-primary-hover"
-                onPress={() => onNavigate(item)}
-              >
-                <Text className="text-sm font-semibold text-primary-foreground">
-                  Navigate
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </ReanimatedSwipeable>
-      );
-    },
-    [expandedIds, liveProfiles, onNavigate, renderRightActions, toggleExpanded],
-  );
-
-  if (loading && items.length === 0) {
-    return (
-      <View className="items-center py-12">
-        <ActivityIndicator color={foregroundColor} />
-        <Text className="mt-3 text-sm text-muted-foreground">
-          Loading notifications…
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <FlatList
-      data={items}
-      keyExtractor={(n) => n.recipientId}
-      renderItem={renderItem}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => void refresh()}
-          tintColor={foregroundColor}
-        />
-      }
-      ListHeaderComponent={
-        visibleError ? (
-          <Text className="mb-3 text-sm text-destructive">{visibleError}</Text>
-        ) : undefined
-      }
+      data={notifications}
+      keyExtractor={(n) => n.id}
+      renderItem={({ item }) => <NotificationRow item={item} />}
+      refreshing={refreshing}
+      onRefresh={() => void core.notifications.load()}
+      onEndReachedThreshold={0.4}
+      onEndReached={() => {
+        if (inbox && !inbox.atOldest) void core.notifications.loadOlder();
+      }}
       ListEmptyComponent={
-        <View className="items-center py-10">
+        <View className="items-center gap-2 py-16">
           <ThemedIonicons
-            name="notifications-off-outline"
-            size={40}
+            name="notifications-outline"
+            size={28}
             colorClassName="accent-muted-foreground"
           />
-          <Text className="mt-3 text-center text-sm text-muted-foreground">
-            No notifications here. Mentions and updates show up once you start
-            chatting.
+          <Text className="text-sm text-muted-foreground">
+            You're all caught up
           </Text>
         </View>
       }
     />
   );
+}
+
+function NotificationRow({ item }: { item: Notification }) {
+  const core = useHavenCore();
+  const unread = item.read_at === null;
+  const actorName = useNameOf(item.actor_id ?? "");
+  const actorAvatar = useAvatarUrl(item.actor_id);
+  const name = item.actor_id ? actorName : "Haven";
+
+  const open = () => {
+    if (unread) void core.notifications.mark("read", [item.id]).catch(() => {});
+    const intent = notificationIntent(item);
+    const handlers = useMobilePushNavigationStore.getState().handlers;
+    if (intent && intent.kind !== "notifications" && handlers) {
+      dispatchLinkIntent(handlers, intent);
+    }
+  };
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={open}
+      onLongPress={() =>
+        void core.notifications.mark("dismissed", [item.id]).catch(() => {})
+      }
+      className="flex-row items-start gap-3 border-b border-border-panel py-3 active:bg-surface-hover"
+    >
+      <View
+        className={`mt-3 h-2 w-2 rounded-full ${unread ? "bg-primary" : "bg-transparent"}`}
+      />
+      <View className="h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-surface-panel">
+        {actorAvatar ? (
+          <Image
+            source={{ uri: actorAvatar }}
+            style={{ width: 36, height: 36 }}
+          />
+        ) : (
+          <Text className="text-sm font-semibold text-foreground">
+            {name.charAt(0).toUpperCase() || "H"}
+          </Text>
+        )}
+      </View>
+      <View className="min-w-0 flex-1">
+        <Text className="text-sm font-medium text-foreground">
+          {item.title}
+        </Text>
+        {item.body ? (
+          <Text className="mt-0.5 text-xs text-muted-foreground">
+            {item.body}
+          </Text>
+        ) : null}
+        <Text className="mt-1 text-[11px] text-muted-foreground">
+          {formatNotificationTime(item.created_at)}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss notification"
+        hitSlop={10}
+        onPress={() =>
+          void core.notifications.mark("dismissed", [item.id]).catch(() => {})
+        }
+        className="p-1"
+      >
+        <ThemedIonicons
+          name="close"
+          size={16}
+          colorClassName="accent-muted-foreground"
+        />
+      </Pressable>
+    </Pressable>
+  );
+}
+
+function formatNotificationTime(iso: string): string {
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return "";
+  const minutes = Math.floor((Date.now() - then) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(then).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }

@@ -1,19 +1,18 @@
 import { createSolidHavenCore, type HavenSolidCore } from "@solid-client/core";
-import { createLocalStoragePersistence } from "@shared/core";
-import { getWebSupabase, getWebSupabaseConfig } from "./getWebSupabase";
+import { createLocalStoragePersistence } from "@shared/core/persistence/createLocalStoragePersistence";
+import { getWebSupabase } from "./getWebSupabase";
 
 /**
  * Builds the Haven core for the plain-browser (Vercel) web build.
  *
- * Identical to the Tauri core except for two shell choices: persistence is
- * always webview localStorage (no tauri-plugin-store), and no native bridge is
- * injected — `solid-client` runs in its portable browser mode (App with no
- * bridge; useBridge() falls back to web equivalents per capability).
+ * Identical to the Tauri core except for the shell's choices: device storage
+ * is the browser's localStorage, and no native bridge is injected, so
+ * `solid-client` runs in its portable browser mode.
  */
 export function createWebHavenCore(): HavenSolidCore {
   return createSolidHavenCore({
     client: getWebSupabase(),
-    publicConfig: getWebSupabaseConfig(),
     persistence: createLocalStoragePersistence(),
+    context: { platform: "web", distribution: "all" },
   });
 }

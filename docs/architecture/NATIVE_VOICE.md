@@ -96,11 +96,11 @@ sidecar identities map straight onto the UI's `memberVolumes` / roster.
 
 - **Roster & speaking:** there's no in-webview `Room` on Linux, so the roster is
   driven by the Supabase presence channel (`connectPresenceChannel` with
-  `syncRoster` on the shared `VoiceNexus`), and speaking is overlaid from the
-  sidecar's `speaking` event (`VoiceNexus.setSpeakingIds`). `VoiceSolidNexus`
-  builds its store port with rosters keyed by `userId`, so updates reconcile row
-  by row and `<For>` row identity stays stable — this is what keeps the
-  WebKitGTK DOM tree valid (`voiceSolidNexus.test.ts` locks it in).
+  `syncRoster` on the shared `Voice` collection), and speaking is overlaid from
+  the sidecar's `speaking` event (`Voice.setSpeakingIds`). The voice store is
+  made with rosters keyed by `userId` (`VOICE_ROW_KEYS`), so updates reconcile
+  row by row and `<For>` row identity stays stable — this is what keeps the
+  WebKitGTK DOM tree valid (`solidPort.tier2.test.ts` locks it in).
 - **Devices / volume / deafen:** the sidecar rebuilds its cpal capture/playback
   streams on device switch (channels + mixer stay stable), applies per-member
   gain before the mixer, and uses the mixer's master gain for deafen.
@@ -196,5 +196,5 @@ Do **not** bump `livekit` casually — a naive bump can reintroduce the exact
 - Seam: `packages/solid-client/src/contexts/BridgeProvider.tsx`,
   `apps/tauri/src/bridge.ts`
 - UI/session: `packages/solid-client/src/contexts/VoiceProvider.tsx`,
-  `packages/shared/src/nexus/voice/voiceNexus.ts` (logic),
-  `packages/solid-client/src/data/voice/voiceSolidNexus.ts` (Solid binding)
+  `packages/shared/src/collections/voice/voice.ts` (logic; its store is made
+  by `HavenSolidCore`)

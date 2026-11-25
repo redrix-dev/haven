@@ -174,12 +174,12 @@
       "script": "test:db"
     },
     {
-      "id": "root:test:notifications:smoke",
-      "label": "test:notifications:smoke",
+      "id": "root:test:functions",
+      "label": "test:functions",
       "category": "test",
       "type": "package-script",
       "packageId": "root",
-      "script": "test:notifications:smoke"
+      "script": "test:functions"
     },
     {
       "id": "root:test:signoff",

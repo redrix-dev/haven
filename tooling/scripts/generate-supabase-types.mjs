@@ -49,6 +49,17 @@ const output = execFileSync(
   },
 );
 
+// Each CLI version lays the file out differently (2.105 pre-formatted it,
+// 2.122 does not), so format it here: the file then depends only on the
+// schema. .prettierignore lists it so a repo-wide format leaves it alone.
+const prettier = await import("prettier");
+const options = (await prettier.resolveConfig(outPath)) ?? {};
+const formatted = await prettier.format(output, {
+  ...options,
+  semi: false,
+  filepath: outPath,
+});
+
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
-fs.writeFileSync(outPath, output, "utf8");
+fs.writeFileSync(outPath, formatted, "utf8");
 console.log(`Wrote ${path.relative(repoRoot, outPath)}`);

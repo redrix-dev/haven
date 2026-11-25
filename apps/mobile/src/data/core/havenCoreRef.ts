@@ -17,7 +17,7 @@ export function getHavenCore(): HavenReactCore | null {
 export function requireHavenCore(): HavenReactCore {
   if (!currentCore) {
     throw new Error(
-      "HavenReactCore is not initialized. The host app must call createReactHavenCore({ client, publicConfig, persistence }) before rendering or importing features that touch Supabase.",
+      "HavenReactCore is not initialized. The host app must call createReactHavenCore({ client, persistence, context }) before rendering or importing features that touch Supabase.",
     );
   }
   return currentCore;

@@ -1,7 +1,7 @@
 import type {
   VoicePresenceStateRow,
   VoiceSidebarParticipant,
-} from "@shared/types/types";
+} from "@shared/features/voice/types";
 
 export const voiceParticipantListsEqual = (
   left: VoiceSidebarParticipant[],

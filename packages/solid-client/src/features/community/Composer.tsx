@@ -1,5 +1,5 @@
 import { Show, createSignal, onCleanup } from "solid-js";
-import { ImagePlus, SendHorizontal, X } from "lucide-solid";
+import { CornerUpLeft, ImagePlus, SendHorizontal, X } from "lucide-solid";
 import { Button, MarkdownToolbar } from "@solid-client/components/ui";
 import {
   insertCommunityLink,
@@ -9,14 +9,24 @@ import {
   type CommunityMarkdownFormat,
 } from "@shared/features/messaging/utils/communityMarkdownParity";
 
+/**
+ * The message box. What is typed is the session's draft for the channel
+ * (`body` in, `onInput` out), so it survives switching channels and
+ * restarting the app. Sending empties it at once; a message the database
+ * refuses stays in the list with a retry, not in the box.
+ */
 export function Composer(props: {
-  channelName: string;
-  onSend: (
-    content: string,
-    media?: { file: File; previewUrl: string },
-  ) => Promise<void>;
+  placeholder: string;
+  body: string;
+  onInput: (body: string) => void;
+  /** The message being answered, when there is one. */
+  replyingTo?: { name: string; preview: string } | null;
+  onCancelReply?: () => void;
+  /** Resolves once the message is on its way (an image uploaded first). */
+  onSend: (body: string, image?: File) => Promise<void>;
 }) {
-  const [draft, setDraft] = createSignal("");
+  const draft = () => props.body;
+  const setDraft = (body: string) => props.onInput(body);
   const [sending, setSending] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [pendingImage, setPendingImage] = createSignal<{
@@ -180,9 +190,8 @@ export function Composer(props: {
     setError(null);
 
     try {
-      await props.onSend(content, image ?? undefined);
-      setDraft("");
-      clearPendingImage({ retainPreview: true });
+      await props.onSend(content, image?.file);
+      clearPendingImage();
       autogrow();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to send message");
@@ -196,6 +205,27 @@ export function Composer(props: {
     <div class="shrink-0 px-4 pb-4 pt-1">
       <Show when={error()}>
         <p class="mb-1 text-xs text-send-error">{error()}</p>
+      </Show>
+
+      <Show when={props.replyingTo}>
+        {(reply) => (
+          <div class="mb-1 flex items-center gap-2 rounded-t-lg bg-surface-embed-chip px-3 py-1.5 text-xs text-muted-foreground">
+            <CornerUpLeft size={12} />
+            <span>
+              Replying to{" "}
+              <span class="font-semibold text-foreground">{reply().name}</span>
+            </span>
+            <span class="min-w-0 flex-1 truncate">{reply().preview}</span>
+            <button
+              type="button"
+              aria-label="Stop replying"
+              class="text-muted-foreground hover:text-foreground"
+              onClick={() => props.onCancelReply?.()}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
       </Show>
 
       <Show when={pendingImage()}>
@@ -299,7 +329,7 @@ export function Composer(props: {
             ref={textarea}
             rows={1}
             value={draft()}
-            placeholder={`Message #${props.channelName}`}
+            placeholder={props.placeholder}
             onInput={(e) => {
               setDraft(e.currentTarget.value);
               autogrow();

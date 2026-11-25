@@ -12,7 +12,7 @@ import {
   type RemoteParticipant,
 } from "livekit-client";
 import { useHavenCore } from "@mobile-data";
-import { useVoiceSession } from "@mobile-data/hooks";
+import { useVoiceSession } from "@mobile-data";
 import { useVoiceMemberVolumes } from "@/features/voice/hooks/useVoiceMemberVolumes";
 import type {
   VoiceControllerChannel,
@@ -25,6 +25,7 @@ import type { VoiceCaptureLevelSource } from "@shared/features/voice/utils/input
 import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
 import { perfTrace } from "@shared/debug/perfTrace";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import type { VoiceSoundEvent } from "@shared/features/voice/utils/voiceSounds";
 import { playMobileVoiceSound } from "./mobileVoiceSounds";
 import {
   monitorNativeCaptureLevel,
@@ -202,7 +203,7 @@ export function useMobileLiveKitVoiceSession({
   livekitRoom: Room;
 } {
   const core = useHavenCore();
-  const voiceSession = useVoiceSession(core.voice);
+  const voiceSession = useVoiceSession();
   const joined = voiceSession.joined;
   const isMuted = voiceSession.isMuted;
   const isDeafened = voiceSession.isDeafened;
@@ -215,6 +216,23 @@ export function useMobileLiveKitVoiceSession({
   const [localSpeaking, setLocalSpeaking] = useState(false);
   const [localMicTrack, setLocalMicTrack] = useState<LocalAudioTrack | null>(
     null,
+  );
+  // Starting or stopping capture reconfigures the shared iOS audio session,
+  // and a cue playing across that change stutters. So in a call, a mute or
+  // deafen cue waits here until the capture change below has finished.
+  const pendingCueRef = useRef<VoiceSoundEvent | null>(null);
+  const playCue = useCallback(
+    (event: VoiceSoundEvent) => {
+      if (!core.voice.getSnapshot().joined) {
+        void playMobileVoiceSound(
+          event,
+          core.voice.getSnapshot().soundSettings,
+        );
+        return;
+      }
+      pendingCueRef.current = event;
+    },
+    [core.voice],
   );
   // Native capture measurement for the gate. Readings arrive from the native
   // volume processor about every 40 ms — including silence — so freshness is
@@ -506,13 +524,32 @@ export function useMobileLiveKitVoiceSession({
     const cleanup = async () => {
       const room = roomRef.current;
       const wasJoined = core.voice.getSnapshot().joined;
+      // Level sampling reads the mic track's stats; it must not outlive the
+      // track. Stopping it changes no audio.
+      stopInputLevelPolling();
+      // Before anything else changes, so nothing reconfigures audio under it.
+      if (wasJoined) {
+        pendingCueRef.current = null;
+        await playMobileVoiceSound(
+          "leave",
+          core.voice.getSnapshot().soundSettings,
+        ).catch(() => false);
+      }
+      // Stop recording before disabling the track, as mute does. A disabled
+      // track over a still-recording engine is a voice-processing input mute,
+      // and iOS plays its system mic sound for that (heard as a Siri-like tone).
+      let recordingError: unknown = null;
+      try {
+        await setNativeRecording(false);
+      } catch (error) {
+        recordingError = error;
+      }
       room?.localParticipant.audioTrackPublications.forEach((publication) => {
         const track = publication.audioTrack?.mediaStreamTrack;
         if (track) track.enabled = false;
       });
       joinGenerationRef.current += 1;
       intentionalDisconnectRef.current = true;
-      stopInputLevelPolling();
       setLocalMicTrack(null);
       setJoining(false);
       setError(null);
@@ -537,22 +574,17 @@ export function useMobileLiveKitVoiceSession({
         // Presence cleanup is best-effort; Supabase also removes presence on socket close.
       }
       try {
-        if (wasJoined)
-          await playMobileVoiceSound(
-            "leave",
-            core.voice.getSnapshot().soundSettings,
-          );
         await room?.disconnect();
       } catch {
         // Ignore disconnect races.
       }
-      try {
-        await setNativeRecording(false);
-      } catch (error) {
+      if (recordingError)
         setError(
-          getErrorMessage(error, "Could not stop microphone recording."),
+          getErrorMessage(
+            recordingError,
+            "Could not stop microphone recording.",
+          ),
         );
-      }
       nativeCaptureSampleRef.current = null;
       try {
         await AudioSession.stopAudioSession();
@@ -599,10 +631,7 @@ export function useMobileLiveKitVoiceSession({
       timer.mark("permissions-ready");
 
       const credentialsPromise = core.voice
-        .fetchJoinCredentials(
-          targetChannel.communityId,
-          targetChannel.channelId,
-        )
+        .fetchJoinCredentials(targetChannel.channelId)
         .then((credentials) => {
           timer.mark("token-ready");
           return credentials;
@@ -790,11 +819,8 @@ export function useMobileLiveKitVoiceSession({
         )
         .catch(() => {});
     playVoiceControlFeedback(next);
-    void playMobileVoiceSound(
-      next ? "mute" : "unmute",
-      core.voice.getSnapshot().soundSettings,
-    );
-  }, [core.voice]);
+    playCue(next ? "mute" : "unmute");
+  }, [core.voice, playCue]);
 
   const toggleDeafen = useCallback(() => {
     const next = !core.voice.getSnapshot().isDeafened;
@@ -811,11 +837,8 @@ export function useMobileLiveKitVoiceSession({
         .catch(() => {});
     }
     playVoiceControlFeedback(next);
-    void playMobileVoiceSound(
-      next ? "deafen" : "undeafen",
-      core.voice.getSnapshot().soundSettings,
-    );
-  }, [core.voice]);
+    playCue(next ? "deafen" : "undeafen");
+  }, [core.voice, playCue]);
 
   const updateVoiceSettingsPatch = useCallback(
     (patch: Partial<VoiceSettings>) => {
@@ -955,12 +978,21 @@ export function useMobileLiveKitVoiceSession({
       if (track) track.enabled = !isMuted && !isDeafened;
     });
     nativeCaptureSampleRef.current = null;
-    void setNativeRecording(!isMuted && !isDeafened).catch((error) => {
-      core.voice.setMuted(true);
-      setError(
-        getErrorMessage(error, "Could not control microphone recording."),
-      );
-    });
+    const playPendingCue = () => {
+      const cue = pendingCueRef.current;
+      pendingCueRef.current = null;
+      if (cue)
+        void playMobileVoiceSound(cue, core.voice.getSnapshot().soundSettings);
+    };
+    void setNativeRecording(!isMuted && !isDeafened)
+      .then(playPendingCue)
+      .catch((error) => {
+        playPendingCue();
+        core.voice.setMuted(true);
+        setError(
+          getErrorMessage(error, "Could not control microphone recording."),
+        );
+      });
   }, [core.voice, isDeafened, isMuted, joined, setNativeRecording]);
 
   useEffect(() => {

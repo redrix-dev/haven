@@ -2,7 +2,6 @@ import {
   createContext,
   createEffect,
   createSignal,
-  untrack,
   useContext,
   type Accessor,
   type JSX,
@@ -13,7 +12,6 @@ import { featureFlagsToEntitlementKeys } from "@shared/themes/themeEntitlements"
 import { resolveSemanticEntries } from "@shared/themes/semantics";
 import type { HavenTheme } from "@shared/themes/types";
 import { requireHavenSolidCore } from "../core";
-import { useSession } from "./SessionProvider";
 
 /**
  * Owns the theme lifecycle end to end:
@@ -106,34 +104,20 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue>();
 
 export function ThemeProvider(props: { children: JSX.Element }) {
-  const { session } = useSession();
   const core = requireHavenSolidCore();
+  const account = core.stores.account;
 
   const [themeId, setThemeIdSignal] = createSignal(
     getTheme(readStoredThemeId() ?? "default").id,
   );
   applyDocumentTheme(getTheme(themeId()));
 
-  const userId = () => session()?.user.id ?? null;
-  const viewerProfile = core.profiles.viewerProfile(userId);
-
-  // Load the viewer profile after sign-in so the profile theme can hydrate.
+  // The account's theme wins once it is known: from the device copy at
+  // sign-in, then from the database. Tracks only the setting.
   createEffect(() => {
-    const id = userId();
-    if (!id) return;
-    // ensureViewerProfile reads the profile store before its first await.
-    untrack(() => {
-      void core.profiles.ensureViewerProfile(id).catch(() => {
-        // Offline/error: the locally stored theme stays in effect.
-      });
-    });
-  });
-
-  // The profile's theme wins over local storage (mobile does the same).
-  createEffect(() => {
-    const profile = viewerProfile();
-    if (!profile) return;
-    const id = getTheme(profile.theme || "default").id;
+    const saved = account.settings?.theme;
+    if (!saved) return;
+    const id = getTheme(saved).id;
     if (id !== themeId()) {
       setThemeIdSignal(id);
       writeStoredThemeId(id);
@@ -141,6 +125,7 @@ export function ThemeProvider(props: { children: JSX.Element }) {
     }
   });
 
+  /** Shows at once; put back if the database refuses. */
   const setThemeId = async (id: string) => {
     const previousId = themeId();
     const nextId = getTheme(id).id;
@@ -149,18 +134,10 @@ export function ThemeProvider(props: { children: JSX.Element }) {
     setThemeIdSignal(nextId);
     writeStoredThemeId(nextId);
     applyDocumentTheme(getTheme(nextId));
-
-    const uid = userId();
-    const profile = uid ? core.profiles.getViewerProfile(uid) : null;
-    if (!uid || !profile) return; // No profile to persist to — local-only.
+    if (!core.userId) return; // Signed out: this device only.
 
     try {
-      await core.profiles.updateViewerProfile({
-        userId: uid,
-        username: profile.username,
-        avatarUrl: profile.avatarUrl,
-        theme: nextId,
-      });
+      await core.account.updateSettings({ theme: nextId });
     } catch (error) {
       setThemeIdSignal(previousId);
       writeStoredThemeId(previousId);
@@ -169,13 +146,11 @@ export function ThemeProvider(props: { children: JSX.Element }) {
     }
   };
 
-  // Feature flags double as theme entitlement keys: a flag-gated theme becomes
-  // selectable the moment the viewer's flag is enabled (loaded at bootstrap).
   const value: ThemeContextValue = {
     themeId,
     selectableThemes: () =>
       listSelectableBuiltinThemes(
-        new Set(featureFlagsToEntitlementKeys(core.featureFlags.getFlags())),
+        new Set(featureFlagsToEntitlementKeys(account.feature_flags)),
       ),
     setThemeId,
   };
