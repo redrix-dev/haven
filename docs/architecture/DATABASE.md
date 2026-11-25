@@ -450,6 +450,7 @@ old cron jobs, eight old Edge Functions, and the open realtime policy.
 5. **Check it took** (SQL editor). Expect 9 migrations, the two new cron jobs,
    only the `haven_user_created`/`haven_user_deleted` triggers on
    `auth.users`, and only the new realtime policies:
+
    ```sql
    select count(*) from supabase_migrations.schema_migrations;
    select jobname from cron.job;
@@ -457,11 +458,21 @@ old cron jobs, eight old Edge Functions, and the open realtime policy.
    select policyname from pg_policies where schemaname = 'realtime';
    select id from storage.buckets;
    ```
+
    If an old realtime policy is still there, drop it:
    `drop policy "authenticated can receive broadcasts" on realtime.messages;`
    (and the same for `"authenticated can receive private_user broadcasts"`).
    On 2026-11-24 the reset did all of this by itself: 9 migrations, the two
    new cron jobs, the new triggers and policies, the five new buckets.
+
+   **Then restart the database** (dashboard, project settings, restart).
+   The reset recreates `pg_cron` under a scheduler process that is already
+   running, and that process never picks the new jobs up: on 2026-11-24 the
+   every-minute `haven_wake_workers` had not run once after the reset, and
+   `cron.alter_job` did not wake it. After a restart it ran every minute.
+   Check with `select count(*), max(start_time) from cron.job_run_details;`
+   a minute later; a count of 0 means the scheduler is still stale.
+
 6. **Old accounts.** The reset also emptied `auth.users` (0 rows on
    2026-11-24), so everyone signs up again. If accounts are still there, run
    `delete from auth.users;` (the new delete trigger erases each one).
