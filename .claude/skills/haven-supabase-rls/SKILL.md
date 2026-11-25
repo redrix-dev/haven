@@ -117,4 +117,11 @@ convenient. Shape the database for the product; the app follows it.
   field and silently drop rows without it. `git grep` the column and its
   camelCase name (HAV-19 found both).
 - Generated local Supabase files under `.temp/` and `.generated/` are not
-  source artifacts.
+  source artifacts. `supabase link` also writes service versions there
+  (`storage-version`, `storage-migration`), so a linked checkout runs the
+  hosted project's storage locally and CI does not: a storage failure that
+  only CI shows needs `.temp/` moved aside to reproduce.
+- Bumping the `supabase` CLI in `package-lock.json` means bumping
+  `setup-cli` in `ci.yml` to the same version (`npm run check:supabase-cli`
+  fails until you do). Two CLIs leave storage's service and schema at
+  different versions, and every upload fails with 42P10.

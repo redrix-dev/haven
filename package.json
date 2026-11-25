@@ -10,6 +10,7 @@
   "scripts": {
     "lint": "eslint \"{apps,packages,tooling}/**/*.{js,ts,tsx}\"",
     "check:agent-skills": "node tooling/scripts/validate-agent-skills.mjs",
+    "check:supabase-cli": "node tooling/scripts/check-supabase-cli-pin.mjs",
     "check:desktop-version": "node tooling/scripts/check-desktop-version-sync.mjs",
     "check:shared-hex": "node tooling/scripts/check-shared-hex-literals.mjs",
     "check:shared-portable": "node tooling/scripts/check-shared-portable.mjs",
@@ -41,7 +42,7 @@
     "test:all": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run test:unit && npm run test:db && npm run test:backend",
     "test:ci": "npm run test:cleave && npm run test:db && npm run test:backend",
     "ci:verify": "npm run test:ci",
-    "ci:fast": "npm run format:check && npm run lint && npm run check:shared-portable && npm run typecheck && npm run test:unit",
+    "ci:fast": "npm run format:check && npm run check:supabase-cli && npm run lint && npm run check:shared-portable && npm run typecheck && npm run test:unit",
     "ci:mobile": "npm run mobile:typecheck && npm run mobile:bundle",
     "ci:integration": "npm run test:db && npm run test:backend",
     "prepare": "husky",

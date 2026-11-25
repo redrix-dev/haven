@@ -45,6 +45,7 @@ export type Database = {
           lifted_by: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           case_id?: string | null
           created_at?: string
@@ -102,6 +103,7 @@ export type Database = {
           blocker_id: string
           created_at: string
         }
+        ComputedFields: never
         Insert: {
           blocked_id: string
           blocker_id: string
@@ -134,6 +136,7 @@ export type Database = {
           case_id: string
           media_id: string
         }
+        ComputedFields: never
         Insert: {
           case_id: string
           media_id: string
@@ -167,6 +170,7 @@ export type Database = {
           name: string
           position: number
         }
+        ComputedFields: never
         Insert: {
           community_id: string
           created_at?: string
@@ -202,6 +206,7 @@ export type Database = {
           role_id: string | null
           user_id: string | null
         }
+        ComputedFields: never
         Insert: {
           can_manage?: boolean | null
           can_send?: boolean | null
@@ -252,6 +257,7 @@ export type Database = {
           joined_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           channel_id: string
           joined_at?: string
@@ -286,6 +292,7 @@ export type Database = {
           muted_until: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           channel_id: string
           last_read_message_id?: string | null
@@ -328,6 +335,7 @@ export type Database = {
           position: number
           topic: string | null
         }
+        ComputedFields: never
         Insert: {
           category_id?: string | null
           community_id?: string | null
@@ -374,6 +382,7 @@ export type Database = {
           category_id: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           category_id: string
           user_id: string
@@ -410,6 +419,7 @@ export type Database = {
           report_reason_required: boolean
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           description?: string | null
@@ -453,17 +463,18 @@ export type Database = {
           actor_id: string
           community_id: string
           created_at: string
-          detail: Json
+          detail: NonNullable<Json>
           id: string
           target_id: string | null
           target_user_id: string | null
         }
+        ComputedFields: never
         Insert: {
           action: Database["public"]["Enums"]["audit_action"]
           actor_id: string
           community_id: string
           created_at?: string
-          detail?: Json
+          detail?: NonNullable<Json>
           id?: string
           target_id?: string | null
           target_user_id?: string | null
@@ -473,7 +484,7 @@ export type Database = {
           actor_id?: string
           community_id?: string
           created_at?: string
-          detail?: Json
+          detail?: NonNullable<Json>
           id?: string
           target_id?: string | null
           target_user_id?: string | null
@@ -510,6 +521,7 @@ export type Database = {
           reason: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           banned_by: string
           community_id: string
@@ -555,6 +567,7 @@ export type Database = {
           nickname: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           community_id: string
           joined_at?: string
@@ -592,6 +605,7 @@ export type Database = {
           id: string
           report_id: string
         }
+        ComputedFields: never
         Insert: {
           author_id: string
           body: string
@@ -631,13 +645,14 @@ export type Database = {
           id: string
           reason: string | null
           reporter_id: string
-          snapshot: Json
+          snapshot: NonNullable<Json>
           status: Database["public"]["Enums"]["report_status"]
           subject_kind: Database["public"]["Enums"]["report_subject"]
           subject_message_id: string | null
           subject_user_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           community_id: string
           created_at?: string
@@ -645,7 +660,7 @@ export type Database = {
           id?: string
           reason?: string | null
           reporter_id: string
-          snapshot: Json
+          snapshot: NonNullable<Json>
           status?: Database["public"]["Enums"]["report_status"]
           subject_kind: Database["public"]["Enums"]["report_subject"]
           subject_message_id?: string | null
@@ -659,7 +674,7 @@ export type Database = {
           id?: string
           reason?: string | null
           reporter_id?: string
-          snapshot?: Json
+          snapshot?: NonNullable<Json>
           status?: Database["public"]["Enums"]["report_status"]
           subject_kind?: Database["public"]["Enums"]["report_subject"]
           subject_message_id?: string | null
@@ -712,6 +727,7 @@ export type Database = {
           note: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           enabled: boolean
           expires_at?: string | null
@@ -749,6 +765,7 @@ export type Database = {
           enabled_by_default: boolean
           key: string
         }
+        ComputedFields: never
         Insert: {
           description: string
           enabled_by_default?: boolean
@@ -766,6 +783,7 @@ export type Database = {
           community_id: string
           flair_id: string
         }
+        ComputedFields: never
         Insert: {
           community_id: string
           flair_id: string
@@ -804,6 +822,7 @@ export type Database = {
           label: string
           retired_at: string | null
         }
+        ComputedFields: never
         Insert: {
           background_token?: string
           color_token?: string
@@ -849,6 +868,7 @@ export type Database = {
           owner_id: string
           uses: number
         }
+        ComputedFields: never
         Insert: {
           code: string
           created_at?: string
@@ -886,6 +906,7 @@ export type Database = {
           recipient_id: string
           sender_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           id?: string
@@ -921,6 +942,7 @@ export type Database = {
           user_high_id: string
           user_low_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           user_high_id: string
@@ -959,6 +981,7 @@ export type Database = {
           max_uses: number | null
           uses: number
         }
+        ComputedFields: never
         Insert: {
           code: string
           community_id: string
@@ -1011,6 +1034,7 @@ export type Database = {
           title: string | null
           url: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           description?: string | null
@@ -1063,6 +1087,7 @@ export type Database = {
           width: number | null
           withheld_at: string | null
         }
+        ComputedFields: never
         Insert: {
           bucket: string
           created_at?: string
@@ -1071,7 +1096,7 @@ export type Database = {
           id?: string
           message_id?: string | null
           mime_type: string
-          object_path?: string
+          object_path?: never
           owner_id: string
           purpose: Database["public"]["Enums"]["media_purpose"]
           released_at?: string | null
@@ -1092,7 +1117,7 @@ export type Database = {
           id?: string
           message_id?: string | null
           mime_type?: string
-          object_path?: string
+          object_path?: never
           owner_id?: string
           purpose?: Database["public"]["Enums"]["media_purpose"]
           released_at?: string | null
@@ -1129,6 +1154,7 @@ export type Database = {
           role_id: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           assigned_at?: string
           community_id: string
@@ -1165,6 +1191,7 @@ export type Database = {
           message_id: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           emoji: string
@@ -1206,6 +1233,7 @@ export type Database = {
           nonce: string | null
           reply_to_id: string | null
         }
+        ComputedFields: never
         Insert: {
           author_id: string
           body: string
@@ -1267,6 +1295,7 @@ export type Database = {
           sound: boolean
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           in_app?: boolean
           kind: Database["public"]["Enums"]["notification_kind"]
@@ -1311,6 +1340,7 @@ export type Database = {
           sound: boolean
           title: string
         }
+        ComputedFields: never
         Insert: {
           actor_id?: string | null
           body: string
@@ -1412,6 +1442,7 @@ export type Database = {
           starts_at: string | null
           title: string
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           community_id?: string | null
@@ -1477,6 +1508,7 @@ export type Database = {
           outcome: Database["public"]["Enums"]["onboarding_outcome"]
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           answered_at?: string
           campaign_key: string
@@ -1518,6 +1550,7 @@ export type Database = {
           note: string | null
           runtime_version: string
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           bundle_url: string
@@ -1555,6 +1588,7 @@ export type Database = {
           reversed_by: string | null
           rule: string | null
         }
+        ComputedFields: never
         Insert: {
           actions?: Database["public"]["Enums"]["case_action"][]
           case_id: string
@@ -1608,15 +1642,16 @@ export type Database = {
           actor_id: string | null
           case_id: string
           created_at: string
-          detail: Json
+          detail: NonNullable<Json>
           id: string
           kind: Database["public"]["Enums"]["case_event_kind"]
         }
+        ComputedFields: never
         Insert: {
           actor_id?: string | null
           case_id: string
           created_at?: string
-          detail?: Json
+          detail?: NonNullable<Json>
           id?: string
           kind: Database["public"]["Enums"]["case_event_kind"]
         }
@@ -1624,7 +1659,7 @@ export type Database = {
           actor_id?: string | null
           case_id?: string
           created_at?: string
-          detail?: Json
+          detail?: NonNullable<Json>
           id?: string
           kind?: Database["public"]["Enums"]["case_event_kind"]
         }
@@ -1657,13 +1692,14 @@ export type Database = {
           preserve_until: string | null
           reason: string | null
           reporter_id: string | null
-          snapshot: Json
+          snapshot: NonNullable<Json>
           source: Database["public"]["Enums"]["case_source"]
           status: Database["public"]["Enums"]["case_status"]
           subject_message_id: string | null
           subject_user_id: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           community_id?: string | null
           community_report_id?: string | null
@@ -1675,7 +1711,7 @@ export type Database = {
           preserve_until?: string | null
           reason?: string | null
           reporter_id?: string | null
-          snapshot: Json
+          snapshot: NonNullable<Json>
           source: Database["public"]["Enums"]["case_source"]
           status?: Database["public"]["Enums"]["case_status"]
           subject_message_id?: string | null
@@ -1693,7 +1729,7 @@ export type Database = {
           preserve_until?: string | null
           reason?: string | null
           reporter_id?: string | null
-          snapshot?: Json
+          snapshot?: NonNullable<Json>
           source?: Database["public"]["Enums"]["case_source"]
           status?: Database["public"]["Enums"]["case_status"]
           subject_message_id?: string | null
@@ -1755,6 +1791,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           can_review_csam?: boolean
@@ -1802,6 +1839,7 @@ export type Database = {
           updated_at: string
           username: string | null
         }
+        ComputedFields: never
         Insert: {
           active_flair_id?: string | null
           avatar_media_id?: string | null
@@ -1851,6 +1889,7 @@ export type Database = {
           token: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           id?: string
@@ -1885,6 +1924,7 @@ export type Database = {
           permission: Database["public"]["Enums"]["community_permission"]
           role_id: string
         }
+        ComputedFields: never
         Insert: {
           community_id: string
           permission: Database["public"]["Enums"]["community_permission"]
@@ -1916,6 +1956,7 @@ export type Database = {
           position: number
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           color?: string
           community_id: string
@@ -1952,6 +1993,7 @@ export type Database = {
           user_id: string
           version: string
         }
+        ComputedFields: never
         Insert: {
           accepted_at?: string
           user_id: string
@@ -1984,6 +2026,7 @@ export type Database = {
           published_at: string
           version: string
         }
+        ComputedFields: never
         Insert: {
           published_at?: string
           version: string
@@ -2002,6 +2045,7 @@ export type Database = {
           source: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           expires_at?: string | null
           flair_id: string
@@ -2042,6 +2086,7 @@ export type Database = {
           updated_at: string
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           details_visible_to?: Database["public"]["Enums"]["audience"]
           dms_from?: Database["public"]["Enums"]["audience"]
@@ -2247,7 +2292,10 @@ export type Database = {
       delete_channel: { Args: { p_channel_id: string }; Returns: undefined }
       delete_community: { Args: { p_community_id: string }; Returns: undefined }
       delete_message: { Args: { p_message_id: string }; Returns: undefined }
-      delete_my_account: { Args: never; Returns: undefined }
+      delete_my_account: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       delete_role: { Args: { p_role_id: string }; Returns: undefined }
       edit_message: {
         Args: { p_body: string; p_message_id: string }
@@ -2321,7 +2369,7 @@ export type Database = {
         }
       }
       get_my_feature_flags: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           enabled: boolean
           key: string
@@ -2332,7 +2380,7 @@ export type Database = {
         Returns: Database["public"]["Enums"]["community_permission"][]
       }
       get_my_profile: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: Database["public"]["CompositeTypes"]["my_profile_record"][]
         SetofOptions: {
           from: "*"
@@ -2362,7 +2410,7 @@ export type Database = {
         }
       }
       get_unread_counts: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           channel_id: string
           unread: number
@@ -2414,7 +2462,7 @@ export type Database = {
         }
       }
       list_decisions_about_me: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           actions: Database["public"]["Enums"]["case_action"][]
           case_id: string
@@ -2470,7 +2518,7 @@ export type Database = {
         }
       }
       list_my_reports: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           audience: string
           created_at: string
@@ -3309,4 +3357,3 @@ export const Constants = {
     },
   },
 } as const
-
