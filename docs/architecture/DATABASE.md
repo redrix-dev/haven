@@ -489,7 +489,9 @@ old cron jobs, eight old Edge Functions, and the open realtime policy.
    the old `HAVEN_EXPO_ACCESS_TOKEN`, `HAVEN_WEB_PUSH_VAPID_*` and `XIRSYS_*`
    are read by nothing now. The worker secret is step 2 below. Deploy the new
    set: `npx supabase functions deploy push-worker mail-worker link-preview-worker media-worker voice-token voice-control update-manifest`.
-8. Then "Setting up a project" below, steps 1–3 and 5.
+8. Then "Setting up a project" below, steps 1–3, 5 and 7. A reset deletes
+   every row that is data rather than schema: accounts, staff rows,
+   campaigns, flairs, feature flags.
 
 The live web app (`main`) and installed builds stop working at step 4 until
 the rebuild is promoted and released.
@@ -530,6 +532,38 @@ After the migrations are applied to a hosted project:
    part is a code change), disable the legacy `anon` and `service_role` keys,
    wait at least 1 h 15 min, then revoke the legacy secret under
    "Previously used".
+7. **Onboarding campaigns** (the mobile alpha's required "join the testers"
+   screen). Campaigns are data, not migrations: no migration creates one, and
+   a reset deletes them. The reset on 2026-11-24 deleted the alpha campaign;
+   it was added back on 2026-11-25 (HAV-27) as below. New iOS accounts see
+   the terms screen first (the migrations create terms version
+   `2026-03-24`), then the campaign.
+   1. In the app, signed in as the founder's own account, create the
+      testers' community. A campaign points at a real community, and
+      communities are made through the app. Today it is
+      `Haven TestFlight Alpha`.
+   2. Add the campaign. `supabase/seeds/dev/10_community.sql`
+      (`dev_join_hearth`) is the same thing for the dev backend:
+      ```sql
+      insert into public.onboarding_campaigns
+        (key, title, description, required, community_id, platforms, min_app_version)
+      select 'alpha_join_testers', 'Join the testers',
+             'Haven is in alpha. Finishing this joins you to the testers'' community.',
+             true, c.id, '{ios}', '0.1.0'
+      from public.communities c where c.name = 'Haven TestFlight Alpha';
+      ```
+      Add `flair_id` to hand out a flair on finishing (the flair is an
+      operator insert into `public.flairs` first).
+   3. Sign up a fresh account from the TestFlight build: the screen appears
+      after the terms, cannot be skipped, and finishing it joins the
+      community.
+
+   The app reports the `version` in `apps/mobile/app.json` (`0.1.0` from the
+   first TestFlight build on the rebuilt database), so `min_app_version`
+   keeps a campaign off older builds. Never set `distributions`: the app
+   always reports `all`, so a `testflight` filter never matches
+   (`apps/mobile/src/features/onboarding/mobileOnboardingContext.ts`). What is
+   offered is decided by `private.onboarding_is_offered`.
 
 ## Tests
 

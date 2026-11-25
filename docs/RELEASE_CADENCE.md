@@ -185,12 +185,37 @@ Unchanged by the desktop/web rebuild; documented here for completeness. Mobile r
 a **custom Expo Updates-compatible OTA pipeline** (asset hashing → bundle/manifest
 → Supabase Edge Function), not EAS Update.
 
+### The three numbers
+
+| Number                                 | Set in                                                       | Shows as                              | Change it when                                              |
+| -------------------------------------- | ------------------------------------------------------------ | ------------------------------------- | ----------------------------------------------------------- |
+| Version (`CFBundleShortVersionString`) | `version` in `apps/mobile/app.json` (and its `package.json`) | `0.1.0` in TestFlight                 | a new release; it must go up after an App Store release     |
+| Build (`CFBundleVersion`)              | not in `app.json`; set in Xcode when archiving and uploading | the `(1)`, `(2)` after it             | every upload: a version takes many builds, each number once |
+| `runtimeVersion`                       | `apps/mobile/app.json`                                       | nowhere; only the OTA server reads it | native code changes (a new native module, an SDK bump)      |
+
+- Set the version in `app.json`, never in Xcode: prebuild regenerates `ios/`
+  and overwrites it.
+- TestFlight takes any version, `0.x` included. The App Store only needs each
+  release to be higher than the last one there; once a version is released,
+  no more builds can be uploaded to it.
+- The app reports its version to the database (`list_my_onboarding`), so an
+  onboarding campaign's `min_app_version` can target new builds only.
+- An OTA update reaches only builds with the same `runtimeVersion`
+  (`supabase/functions/update-manifest`). It has nothing to do with the
+  version.
+- History: builds were `0.0.0` until 2026-11-25; the first build on the
+  rebuilt database is `0.1.0`.
+
 ### Standard release
 
 1. `mobile:release:check` (theme/surface checks + preflight + mobile typecheck).
-2. Native build via the Expo/EAS dev-client flow; submit to TestFlight → App Store.
+2. Native build on the mac, by hand: prebuild, then in Xcode Product →
+   Archive and, from the Organizer, Distribute App to App Store Connect →
+   TestFlight → App Store. `npm run mobile:fastlane:build` (match signing)
+   is set up but has never been used.
 3. Publish the OTA bundle/manifest for the matching runtime version.
-4. Tag `mobile-v<semver>`.
+4. Tag the commit that was built `mobile-v<semver>`. Nothing builds from the
+   tag; it marks what is on TestFlight.
 
 ### Mobile hotfix
 
