@@ -60,6 +60,7 @@
     "ios": {
       "icon": "./assets/haven-app-icon.png",
       "bundleIdentifier": "com.redrix.haven.mobile",
+      "appleTeamId": "9H229274JB",
       "associatedDomains": ["applinks:haven.redrixx.com"],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
