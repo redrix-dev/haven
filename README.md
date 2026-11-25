@@ -37,7 +37,7 @@ they were made for us. Building one that did seemed worth the effort.
 
 - **iPhone:** through TestFlight.
 - **Desktop:** Windows and macOS, built with Tauri. The last release is
-  `2.1.0`.
+  `3.0.0`.
 - **Web:** the same app as desktop, served from Vercel.
 
 All three talk to the same database and share the same core logic, so they
