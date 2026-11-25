@@ -103,6 +103,16 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - run: supabase start
       - run: npm run ci:integration
+      # What the services said, for a failure that does not reproduce locally.
+      - name: Supabase service logs
+        if: failure()
+        run: |
+          for c in $(docker ps --format '{{.Names}}' | grep -E 'storage|auth|rest|realtime'); do
+            echo "::group::$c"; docker logs --tail 200 "$c" 2>&1; echo "::endgroup::"
+          done
+          echo "::group::storage schema"
+          psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -c "select indexname, indexdef from pg_indexes where schemaname = 'storage' and tablename = 'objects'" -c "select id, name from storage.migrations order by id desc limit 5"
+          echo "::endgroup::"
       - name: Stop Supabase
         if: always()
         run: supabase stop
