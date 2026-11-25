@@ -136,3 +136,8 @@ files (kept aligned with each other); anything machine- or person-specific stays
 the gitignored `.vscode/` and `.cursor/`. When you change one tracked file's
 repo-wide behavior (exclusions, formatter, file associations), mirror it in the
 other. Both carry a header comment pointing back here.
+
+**Both repos in one window.** `haven.code-workspace` lists `../haven-site` as a
+second folder. Zed keeps no folder list on disk, so open both from the
+terminal: `zed ../haven ../haven-site` from either repo. (Each repo keeps its
+own `.zed/settings.json`.)
