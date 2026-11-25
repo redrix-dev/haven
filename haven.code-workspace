@@ -8,6 +8,10 @@
     {
       "path": ".",
     },
+    // The sister repo (AGENTS.md § Sister Repo). Opens empty if it isn't cloned.
+    {
+      "path": "../haven-site",
+    },
   ],
   "settings": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
