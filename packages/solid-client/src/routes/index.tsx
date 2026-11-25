@@ -22,8 +22,10 @@ import {
   CommunityView,
   CommunityHome,
   CommunityAccessView,
+  CommunityAccessLossHost,
   RoleManagementView,
   CommunitySettingsPanel,
+  DirectMessagesView,
 } from "../features/community";
 import {
   SignInScreen,
@@ -36,17 +38,15 @@ import {
   AppearanceSettings,
   NotificationSettings,
   ProfileSettings,
+  ReportsSettings,
 } from "../features/settings";
-import { DirectMessagesView } from "../features/direct-messages";
-import { FriendsView } from "../features/friends";
+import { FriendLinkView, FriendsView } from "../features/friends";
 import { NotificationsView } from "../features/notifications";
 import { ModmailView, ModmailLoader } from "../features/moderation";
-import {
-  OnboardingScreen,
-  getSolidOnboardingContext,
-} from "../features/onboarding";
+import { OnboardingScreen, TermsScreen } from "../features/onboarding";
 import { VoiceDock, VoicePopout } from "../features/voice";
 import { useBridge } from "../contexts/BridgeProvider";
+import { PeopleProvider } from "../contexts/PeopleProvider";
 import { UpdaterProvider, useUpdater } from "../contexts/UpdaterProvider";
 import { Titlebar } from "../components/ui/Titlebar";
 import { CriticalUpdateOverlay } from "../components/ui/CriticalUpdateOverlay";
@@ -54,9 +54,11 @@ import { Toaster } from "../components/ui/Toaster";
 import { ToastProvider, useToast } from "../contexts/ToastProvider";
 import { requireHavenSolidCore } from "../core";
 import {
-  getNotificationSummary,
-  getNotificationTitle,
-} from "@shared/features/notifications/notificationCopy";
+  accountLoaded,
+  nextOnboarding,
+  termsToAccept,
+} from "@shared/collections/account/selectors";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 /**
  * The registration point: every screen the app can navigate to is one entry
  * here, pointing at a feature's public surface (its index barrel). Popout
@@ -170,25 +172,21 @@ function PopoutLiteShell(props: RouteSectionProps) {
 }
 
 /**
- * Watches the notification nexus for realtime arrivals and surfaces each as a
- * toast. Mounted in the authed layout, so `core` is bootstrapped and the
- * ToastProvider sits above it. The stack itself is AppToaster, in MainShell.
+ * Shows each notification that arrives over realtime as a toast. Mounted in
+ * the authed layout, under the ToastProvider. The stack itself is
+ * AppToaster, in MainShell.
  */
 function NotificationToastLayer() {
   const toast = useToast();
-  const incoming = requireHavenSolidCore().notifications.incoming();
-  let lastSeq = 0;
-
+  const core = requireHavenSolidCore();
   createEffect(() => {
-    const next = incoming();
-    if (!next || next.seq === lastSeq) return;
-    lastSeq = next.seq;
+    const next = core.arrived();
+    if (!next?.notification.in_app) return;
     toast.show({
-      title: getNotificationTitle(next.item),
-      body: getNotificationSummary(next.item),
+      title: next.notification.title,
+      body: next.notification.body,
     });
   });
-
   return null;
 }
 
@@ -203,58 +201,56 @@ function AppToaster() {
 }
 
 /**
- * Gates the authed app behind any pending onboarding campaigns. On mount it
- * loads the user's campaigns; while loading it shows a spinner, on error a
- * retry, and if a campaign is pending it shows the onboarding screen instead of
- * the app. No campaigns → renders the app (the fallback). Server returns only
- * not-yet-completed campaigns, so most sessions fall straight through.
+ * Gates the authed app on what the account still asks for: the newest terms
+ * first, then each introduction the database offers this build, in order.
+ * Until the account has loaded this session the app shows as it was left;
+ * a gate appears only once the database has said it applies.
  */
-function OnboardingGate(props: { children: JSX.Element }) {
+function AccountGate(props: { children: JSX.Element }) {
   const core = requireHavenSolidCore();
-  const bridge = useBridge();
-  const context = getSolidOnboardingContext(bridge.window != null);
-  const onboarding = core.onboarding;
+  const account = core.stores.account;
+  const [busy, setBusy] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
 
-  const load = () => {
-    void onboarding
-      .load(context)
-      .catch((err) => console.warn("[OnboardingGate] load failed", err));
+  const run = async (work: () => Promise<unknown>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await work();
+    } catch (err) {
+      setError(getErrorMessage(err, "Something went wrong. Please try again."));
+    } finally {
+      setBusy(false);
+    }
   };
-  onMount(load);
+
+  const terms = () => (accountLoaded(account) ? termsToAccept(account) : null);
+  const campaign = () =>
+    accountLoaded(account) ? nextOnboarding(account) : null;
 
   return (
     <Switch fallback={props.children}>
-      <Match when={!onboarding.state.loaded || onboarding.state.loading}>
-        <div class="flex h-full w-full items-center justify-center bg-background">
-          <div class="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-primary" />
-        </div>
+      <Match when={terms()}>
+        {(version) => (
+          <TermsScreen
+            version={version()}
+            busy={busy()}
+            error={error()}
+            onAccept={() => void run(() => core.account.acceptTerms(version()))}
+          />
+        )}
       </Match>
-      <Match when={onboarding.state.error}>
-        <div class="flex h-full w-full flex-col items-center justify-center gap-3 bg-background p-6 text-center">
-          <p class="text-sm text-muted-foreground">Onboarding couldn't load.</p>
-          <button
-            type="button"
-            onClick={() => load()}
-            class="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            Retry
-          </button>
-        </div>
-      </Match>
-      <Match when={onboarding.state.campaigns[0]}>
-        {(campaign) => (
+      <Match when={campaign()}>
+        {(next) => (
           <OnboardingScreen
-            campaign={campaign()}
-            completing={
-              onboarding.state.completingCampaignKey === campaign().key
-            }
-            error={onboarding.state.completionError}
+            campaign={next()}
+            busy={busy()}
+            error={error()}
             onComplete={() =>
-              void core
-                .completeOnboarding(campaign().key, context)
-                .catch((err) =>
-                  console.warn("[OnboardingGate] complete failed", err),
-                )
+              void run(() => core.answerOnboarding(next().key, "completed"))
+            }
+            onSkip={() =>
+              void run(() => core.answerOnboarding(next().key, "skipped"))
             }
           />
         )}
@@ -292,22 +288,25 @@ function AppLayout(props: RouteSectionProps) {
       </Match>
 
       <Match when={session()}>
-        <OnboardingGate>
-          <div class="flex h-full w-full overflow-hidden bg-surface-app">
-            <div class="flex h-full flex-col">
-              <div class="min-h-0 flex-1">
-                <CommunitySidebar />
+        <PeopleProvider>
+          <AccountGate>
+            <div class="flex h-full w-full overflow-hidden bg-surface-app">
+              <div class="flex h-full flex-col">
+                <div class="min-h-0 flex-1">
+                  <CommunitySidebar />
+                </div>
+                <VoiceDock />
               </div>
-              <VoiceDock />
+              <main class="flex flex-1 flex-col overflow-hidden">
+                {props.children}
+              </main>
             </div>
-            <main class="flex flex-1 flex-col overflow-hidden">
-              {props.children}
-            </main>
-          </div>
-          <NotificationToastLayer />
-          <ModmailLoader />
-          <CommunitySettingsPanel />
-        </OnboardingGate>
+            <NotificationToastLayer />
+            <ModmailLoader />
+            <CommunityAccessLossHost />
+            <CommunitySettingsPanel />
+          </AccountGate>
+        </PeopleProvider>
       </Match>
     </Switch>
   );
@@ -343,6 +342,7 @@ export const routes: RouteDefinition[] = [
           { path: "/communities", component: CommunityAccessView },
           { path: "/invite/:inviteCode", component: CommunityAccessView },
           { path: "/friends", component: FriendsView },
+          { path: "/friend/:code", component: FriendLinkView },
           { path: "/notifications", component: NotificationsView },
           { path: "/modmail", component: ModmailView },
           { path: "/direct-messages", component: DirectMessagesView },
@@ -361,6 +361,7 @@ export const routes: RouteDefinition[] = [
           },
           { path: "/settings/appearance", component: AppearanceSettings },
           { path: "/settings/profile", component: ProfileSettings },
+          { path: "/settings/reports", component: ReportsSettings },
           {
             path: "/settings/notifications",
             component: NotificationSettings,

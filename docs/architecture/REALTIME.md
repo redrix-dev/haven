@@ -1,59 +1,73 @@
-# Realtime — event contract & coverage
+# Realtime: what each event does
 
-Maintained alongside [HAVEN_CORE.md](./HAVEN_CORE.md). One sentence per row: does the private
-user channel broadcast this event, and does `routeRealtimeEvent` route it into a cache?
-The Solid core (`HavenSolidCore`) implements the same `RealtimeMutationTarget` contract
-against this same matrix.
+Each signed-in person listens on one topic, `user:<id>`. The database sends
+every event about what they can see there ([DATABASE.md](./DATABASE.md#realtime)
+has the list, the audiences and the payloads). The only other topics are
+voice presence, `voice:<channel id>`, joined while looking at or sitting in a
+voice channel.
 
-> **Post-cleave:** routing logic lives in `packages/shared/src/core/routeRealtimeEvent.ts` and
-> operates on `RealtimeMutationTarget` (implemented by `HavenReactCore` on mobile). Message
-> cache class: `CommunityMessageCache` (`apps/mobile/src/data/messages/`).
+One table applies every event, the same on every platform:
+`eventTable()` in
+[`collections/core/havenCore.ts`](../../packages/shared/src/collections/core/havenCore.ts).
 
-## Design contract
+## The contract
 
-- **HavenReactCore orchestrates** session bootstrap, `routeEvent`, and cross-cache commands
-  (policy sync, access revoked, focus load).
-- **Realtime is the mutation bus** for data that changed elsewhere.
-- **Default handler shape:** one event → one primary cache → patch, evict, or single-domain reload.
-  Multi-cache work is explicit in `routeRealtimeEvent` or `apps/mobile/src/data/core/commands/*`.
-- **UI writes:** call the authoritative cache (or RPC); let the event path update other surfaces.
+- **An event carries the record.** A message event carries the whole message,
+  with its files, reactions and link preview; a channel event the whole
+  channel. Applying it is a write, not a fetch.
+- **One event, one table row.** Most go to one collection. The few that
+  touch more (a message also moves its channel's latest and unread; a
+  community gone forgets its channels, windows, drafts and reports) are the
+  core's.
+- **Screens write through commands; events update everyone else.** A command
+  puts the database's answer in its own collection; the event that follows
+  reaches the person's other devices and other people.
+- **Missed is reloaded.** Events sent while the topic was down are lost, so
+  every reconnect loads everything again (`core.signIn`, BOOTSTRAP.md).
 
-## Coverage matrix
+## The table
 
-| Domain         | Event                           | Backend emits?          | `routeEvent` routes?             | Target                                                       |
-| -------------- | ------------------------------- | ----------------------- | -------------------------------- | ------------------------------------------------------------ |
-| Community      | community list change           | partial (login fetch)   | n/a — fetched on bootstrap       | `CommunityNexus.load`                                        |
-| Channel        | `CHANNEL_INSERT`                | yes                     | yes                              | `ChannelNexus.upsertChannel`                                 |
-| Channel        | `CHANNEL_UPDATE`                | yes                     | yes                              | `ChannelNexus.upsertChannel`                                 |
-| Channel        | `CHANNEL_DELETE`                | yes                     | yes                              | `ChannelNexus.removeChannel` + `messages.evictChannel`       |
-| Channel access | `member_channel_access_revoked` | yes                     | yes                              | `applyAccessRevoked`                                         |
-| Channel group  | `CHANNEL_GROUP_CHANGE`          | yes                     | yes                              | `ChannelNexus.loadForCommunity`                              |
-| Profile        | `PROFILE_IDENTITY_CHANGE`       | yes                     | yes                              | `ProfileNexus.upsert/remove`                                 |
-| Community      | `COMMUNITY_MEMBERSHIP_CHANGE`   | yes                     | yes                              | `CommunityNexus.load(userId)`                                |
-| Message        | `MESSAGE_INSERT`                | yes                     | yes                              | `CommunityMessageCache.insertMessage`                        |
-| Message        | `MESSAGE_UPDATE`                | yes                     | yes                              | `CommunityMessageCache.upsertMessage`                        |
-| Message        | `MESSAGE_DELETE`                | yes                     | yes                              | `CommunityMessageCache.removeMessage`                        |
-| Reaction       | insert / delete                 | per-channel sub removed | partial — via message row update | follow-up: route `REACTION_*`                                |
-| Attachment     | insert / delete                 | per-channel sub removed | partial                          | follow-up: route `ATTACHMENT_*`                              |
-| Link preview   | insert / update                 | per-channel sub removed | partial                          | follow-up: route `LINK_PREVIEW_*`                            |
-| Roles          | `ROLE_CHANGE`                   | yes                     | yes                              | `core.onRoleChange` → hydrate permissions                    |
-| Notifications  | `NOTIFICATION`                  | yes                     | yes                              | `NotificationNexus.loadInbox` + counts refresh               |
-| DM             | `DM_CONVERSATION`               | yes                     | yes                              | `DirectMessageNexus.loadConversations`                       |
-| DM             | `DM_MESSAGE`                    | yes                     | yes                              | `DirectMessageNexus.loadMessages(conversationId)`            |
-| Social         | `SOCIAL_CHANGE`                 | yes                     | yes                              | `SocialNexus.handleSocialChange` + `syncViewerMessagePolicy` |
-| Moderation     | `member_banned`                 | yes                     | yes                              | community access handlers                                    |
-| Moderation     | `report_status_updated`         | yes                     | yes                              | `uiStore` revision bump + inbox refresh where needed         |
+| Event                                        | Applied by                                                                                                                                                 |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `message.created`                            | `messages.applyCreated`, `channels.applyMessageCreated` (latest, unread), `profiles.ensure` the author                                                     |
+| `message.updated`                            | `messages.applyUpdated`                                                                                                                                    |
+| `message.deleted`                            | `messages.applyDeleted`, `channels.applyMessageDeleted`                                                                                                    |
+| `channel.created` / `.updated`               | `channels.applyChannel` (a conversation is a channel)                                                                                                      |
+| `channel.deleted`                            | `channels.applyChannelDeleted`, and its window, draft and place are forgotten                                                                              |
+| `channel.read`                               | `channels.applyRead`: a read mark made on one device clears the badge on the others                                                                        |
+| `community.updated`                          | `communities.applyCommunity`                                                                                                                               |
+| `community.deleted`                          | `communities.applyGone`: access loss, below                                                                                                                |
+| `role.created` / `.updated` / `.deleted`     | `roles.applyRole` / `applyRoleDeleted`                                                                                                                     |
+| `category.created` / `.updated` / `.deleted` | `categories.applyCategory` / `applyCategoryDeleted`                                                                                                        |
+| `member.joined`                              | Someone else: `members.applyMember`. The person, on another device: their communities load again                                                           |
+| `member.updated`                             | `members.applyMember`                                                                                                                                      |
+| `member.left`                                | Someone else: `members.applyLeft`, `roles.applyLeft`. The person: access loss, below                                                                       |
+| `member.banned`                              | `members.applyBanned`; `messages.applyBanned` hides their messages, or marks them hidden for those who may see them                                        |
+| `member.unbanned`                            | `members.applyUnbanned`                                                                                                                                    |
+| `access.changed`                             | The community's structure and channels load again; its reports too, or are forgotten without `manage_reports`                                              |
+| `profile.updated`                            | `profiles.applyProfile`                                                                                                                                    |
+| `friend_request.created` / `.deleted`        | `social.applyRequest` / `applyRequestDeleted`                                                                                                              |
+| `friendship.created` / `.deleted`            | `social.applyFriendship` / `applyFriendshipDeleted`                                                                                                        |
+| `block.created` / `.deleted`                 | `social.applyBlock` / `applyBlockDeleted`                                                                                                                  |
+| `friend_links.changed`                       | `social.loadLinks`                                                                                                                                         |
+| `notification.created`                       | `notifications.applyCreated`; a report outcome or decision reloads the person's reports; the platform's `notification` listener (desktop: sound and toast) |
+| `notifications.changed`                      | `notifications.load`                                                                                                                                       |
+| `report.created` / `.updated`                | `reports.applyCreated` / `applyUpdated`                                                                                                                    |
+| `case.changed`                               | `cases.applyChanged` (Haven staff)                                                                                                                         |
+| `account.changed`                            | `account.load`                                                                                                                                             |
+| `account.restricted`                         | The platform's `restricted` listener: it signs out and says why                                                                                            |
+| `voice.control`                              | `voice.applyRemoteControl`                                                                                                                                 |
 
-## Open holes
+## Access loss
 
-1. **Reactions / attachments / link previews.** Per-channel Supabase subscriptions were removed.
-   The message row itself is refreshed via `MESSAGE_UPDATE`, so child-row changes rely on the next
-   message update or initial page reload. Closing this requires server-side union into the message
-   payload or new private-channel events routed in `routeRealtimeEvent`.
+Leaving (here or on another device), being removed or banned, and a community
+being deleted all end with the person no longer in it: `member.left` for them,
+or `community.deleted`. `communities.applyGone` tells each part to let go
+(members, roles, categories), then the core forgets the community's channels,
+windows, drafts, place and reports, and calls the platform's `communityGone`
+listener, which leaves its voice channel and says so (desktop:
+`CommunityAccessLossHost`; mobile: `MainNavigator`). The screen on it moves
+off once the community is no longer in the store.
 
-## Closed in hook-reduction / cleave
-
-- **Community membership** — `COMMUNITY_MEMBERSHIP_CHANGE` → `CommunityNexus.load(userId)`
-- **Channel groups** — `CHANNEL_GROUP_CHANGE` → `ChannelNexus.loadForCommunity(communityId)`
-- **Profile identities** — `PROFILE_IDENTITY_CHANGE` → `ProfileNexus`
-- **Shared routing decoupled from HavenCore** — `RealtimeMutationTarget` interface (2026-06 cleave)
+Losing one channel, or what the person may do, arrives as `access.changed`:
+the community reloads, and a channel no longer there is forgotten.

@@ -11,10 +11,15 @@ This file is the quick index. Load the relevant project skill under
 
 - Treat `staging` as the integration truth. New feature/fix branches start from
   `staging`, not `main`; promotion to `main` only happens after staged signoff.
+- Work is tracked in the Linear Haven team (`HAV-<n>`). Branch naming, commit
+  message, and merge rules are in `haven-branch-ci-gates`.
 - Read [docs/PRINCIPLES.md](docs/PRINCIPLES.md) before architectural work.
   The prime rule is understandable correctness.
 - Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before moving state,
   adding shared logic, or changing app boundaries.
+- Read [docs/architecture/DATABASE.md](docs/architecture/DATABASE.md) before
+  touching the database or anything that calls it. The database is shaped by
+  what the product needs; the application follows it, never the reverse.
 - If code and docs disagree, the code wins and the docs are fixed in the same
   change.
 - Keep generated local artifacts out of commits: `dist/`, `test-reports/`,
@@ -28,7 +33,6 @@ This file is the quick index. Load the relevant project skill under
 | Starting, scoping, testing, or handing off any change                                                              | [haven-branch-ci-gates](.claude/skills/haven-branch-ci-gates/SKILL.md)             |
 | Changing `packages/shared`, backend clients, HavenCore contracts, realtime routing, or platform ports              | [haven-shared-core-boundary](.claude/skills/haven-shared-core-boundary/SKILL.md)   |
 | Adding or changing a desktop/web Solid feature, route, UI primitive, or popout                                     | [haven-solid-feature-slice](.claude/skills/haven-solid-feature-slice/SKILL.md)     |
-| Adding or changing a Solid data nexus/cache in `packages/solid-client/src/data`                                    | [haven-solid-nexus](.claude/skills/haven-solid-nexus/SKILL.md)                     |
 | Writing or changing any Solid `createEffect`, store subscription, or realtime handler                              | [haven-solid-reactivity](.claude/skills/haven-solid-reactivity/SKILL.md)           |
 | Changing the Tauri desktop shell, bridge, capabilities, deep links, updater bridge, persistence, or popout windows | [haven-tauri-desktop-shell](.claude/skills/haven-tauri-desktop-shell/SKILL.md)     |
 | Changing desktop release workflow, updater signing, version sync, release notes, or packaged build behavior        | [haven-tauri-release](.claude/skills/haven-tauri-release/SKILL.md)                 |
@@ -47,18 +51,42 @@ This file is the quick index. Load the relevant project skill under
   client.
 - `apps/web` - Vite static web shell for the same Solid client.
 - `packages/shared` - portable domain logic, backend clients, shared types,
-  themes, and realtime routing. No React, no Solid, no platform cache.
-- `packages/solid-client` - Solid UI, Solid-native caches, desktop/web
-  composition root, and feature slices.
+  themes, the collections and the shared `HavenCore` with its realtime event
+  table. No React, no Solid; reactive stores belong to the platforms.
+- `packages/solid-client` - Solid UI, the desktop/web `HavenSolidCore`
+  (Solid stores for the collections), and feature slices.
 - `supabase` - migrations, RLS policies, Edge Functions, fixtures, helpers, and
   SQL regression suites.
 - `tooling` - repo checks, mobile wrappers, Supabase test runners, release
   signoff/report scripts, and shared test support.
 
+## Sister Repo: haven-site
+
+`haven-site` lives next to this repo at `../haven-site`
+(`redrix-dev/haven-site`). It is the public website and the staff tools:
+the home page, the dev log, the "What's new" release articles, the privacy and
+terms pages, and the staff report admin (`/admin/reports`). Next.js and
+Keystatic, deployed by Vercel from `master`. It has no `staging`: branch from
+`master` and open a PR to `master`. Its own `AGENTS.md` has its rules.
+
+Touch it when a change here needs one there:
+
+- **A release.** `npm run release:site-draft -- <tag>` turns
+  `docs/releases/<tag>.md` into a draft article in
+  `../haven-site/content/releases/`. See
+  [docs/releases/README.md](docs/releases/README.md).
+- **The database.** The staff admin reads the database as a signed-in staff
+  account. A change to the staff tables or RPCs breaks it until it is changed
+  to match.
+- **Legal text or brand.** `haven-site/lib/content/legal.ts` is the published
+  privacy policy and terms. A person reviews every change to it before it
+  merges.
+
 ## Guardrails That Matter
 
 - `npm run test:cleave` is the fast merge floor: lint, shared portability,
-  typecheck, mobile typecheck, mobile bundle smoke, and unit tests.
+  typecheck, mobile typecheck, mobile bundle smoke, unit tests, and the Tier-2
+  render settle tests.
 - `npm run test:ci` adds `test:db` and `test:backend`; use it for DB/shared
   behavior changes.
 - `npm run mobile:release:check` gates mobile release work.
@@ -72,10 +100,13 @@ This file is the quick index. Load the relevant project skill under
 
 - Do not put permission decisions in UI. Security lives in Postgres RLS or
   security-definer RPCs; clients reflect database truth.
-- Do not share reactive memory across frameworks. Share pure logic in
-  `packages/shared`; keep React and Solid caches per-platform.
+- Do not share reactive memory across frameworks. Domain logic lives once in
+  the shared collections and `HavenCore`; `HavenSolidCore` and
+  `HavenReactCore` only make the stores and expose reads. A behavior change
+  written in a platform is a second implementation.
 - Do not create Supabase clients, call RPCs, or open domain realtime channels in
-  UI/features. Use host bootstrap, HavenCore, backend clients, and nexuses.
+  UI/features. Screens call the core's and the collections' commands, and
+  `core.backend` only for a read no collection holds.
 - Do not import features from other features in `packages/solid-client`.
   Shared code moves down into `data/`, `components/ui/`, or `packages/shared`.
 - Do not add `@tauri-apps/*` to `packages/solid-client`; the Solid client must
@@ -101,13 +132,6 @@ This file is the quick index. Load the relevant project skill under
 
 - Path aliases are an interim compatibility layer. The durable target is real
   workspace packages with `exports`.
-- Some shared selectors still live under `@shared/nexus/*` while others live
-  under `@shared/features/*/logic`. Follow the existing domain imports; do not
-  consolidate as drive-by cleanup.
-- `revision` fields still exist in shared nexus state because mobile types need
-  them. Solid nexuses should initialize them but not read or increment them.
-- Realtime still has documented holes for reactions, attachments, and link
-  previews; see [docs/architecture/REALTIME.md](docs/architecture/REALTIME.md).
 - Desktop Linux voice has two overlapping bridge concepts (`VoiceBridge` and
   `VoiceRuntimeBridge`). Use the documented `VoiceBridge` seam for the sidecar;
   consolidate only when a real third surface needs it.

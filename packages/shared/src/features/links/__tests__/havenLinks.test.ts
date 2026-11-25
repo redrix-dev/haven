@@ -208,41 +208,47 @@ describe("parseHavenLink — origins", () => {
   });
 });
 
-describe("parseHavenLink — push notification data.url", () => {
-  // Exact shapes expo-push-worker builds with URLSearchParams.
-  it("reads a DM push", () => {
+describe("parseHavenLink — a notification as a query", () => {
+  // The fields `worker_push_delivery` puts in push data, as a query.
+  it("reads a direct message", () => {
     expect(
-      parseHavenLink(
-        "/?kind=dm_message&conversationId=c1&recipientId=r&eventId=e",
-      ),
+      parseHavenLink("/?kind=direct_message&channel_id=c1&notification_id=n"),
     ).toEqual({ kind: "dm", conversationId: "c1" });
   });
 
-  it("opens the requests tab for a received friend request", () => {
-    expect(
-      parseHavenLink("/?kind=friend_request_received&friendRequestId=fr1"),
-    ).toEqual({ kind: "friends", tab: "requests", requestId: "fr1" });
-  });
-
-  it("opens the friends tab for an accepted friend request", () => {
-    expect(parseHavenLink("/?kind=friend_request_accepted")).toEqual({
+  it("opens the requests tab for a friend request", () => {
+    expect(parseHavenLink("/?kind=friend_request")).toEqual({
       kind: "friends",
-      tab: "friends",
+      tab: "requests",
       requestId: null,
     });
   });
 
-  it("reads a channel mention push", () => {
-    expect(
-      parseHavenLink("/?kind=channel_mention&communityId=srv&channelId=ch"),
-    ).toEqual({ kind: "channel", communityId: "srv", channelId: "ch" });
+  it("opens the friends tab for an accepted request or a friend link", () => {
+    for (const kind of ["friend_accepted", "friend_link"]) {
+      expect(parseHavenLink(`/?kind=${kind}`)).toEqual({
+        kind: "friends",
+        tab: "friends",
+        requestId: null,
+      });
+    }
   });
 
-  it("falls back to notifications when a push is missing its ids", () => {
-    expect(parseHavenLink("/?kind=dm_message")).toEqual({
+  it("reads a mention in a community, and in a conversation", () => {
+    expect(
+      parseHavenLink("/?kind=mention&community_id=srv&channel_id=ch"),
+    ).toEqual({ kind: "channel", communityId: "srv", channelId: "ch" });
+    expect(parseHavenLink("/?kind=mention&channel_id=ch")).toEqual({
+      kind: "dm",
+      conversationId: "ch",
+    });
+  });
+
+  it("falls back to notifications when it names no channel", () => {
+    expect(parseHavenLink("/?kind=direct_message")).toEqual({
       kind: "notifications",
     });
-    expect(parseHavenLink("/?kind=channel_mention&communityId=srv")).toEqual({
+    expect(parseHavenLink("/?kind=mention&community_id=srv")).toEqual({
       kind: "notifications",
     });
     expect(parseHavenLink("/?kind=system")).toEqual({ kind: "notifications" });
@@ -259,8 +265,8 @@ describe("parseHavenLink — push notification data.url", () => {
 
 describe("parseHavenLink — bare invite codes and junk", () => {
   it.each([
-    ["abcdef0123", "ABCDEF0123"],
-    ["  ABCDEF0123  ", "ABCDEF0123"],
+    ["abcdef2345", "ABCDEF2345"],
+    ["  ABCDEF2345  ", "ABCDEF2345"],
   ])("reads bare code %j", (input, code) => {
     expect(parseHavenLink(input)).toEqual({ kind: "invite", code });
   });
@@ -269,9 +275,11 @@ describe("parseHavenLink — bare invite codes and junk", () => {
     "",
     "   ",
     "hello",
-    "ABCDEF012",
-    "ABCDEF01234",
-    "ZZZZZZZZZZ",
+    "ABCDEF234",
+    "ABCDEF23456",
+    // 0, 1, I, L and O are not in the alphabet.
+    "ABCDEF0123",
+    "IIIIIIIIII",
     "haven://invite/%E0%A4%A",
     "https://haven.redrixx.com/direct-messages/%",
   ])("returns unsupported for %j without throwing", (input) => {
@@ -283,7 +291,8 @@ describe("parseHavenLink — bare invite codes and junk", () => {
 describe("buildHavenLink", () => {
   const buildable: BuildableHavenLinkIntent[] = [
     { kind: "home" },
-    { kind: "invite", code: "ABCDEF0123" },
+    { kind: "invite", code: "ABCDEF2345" },
+    { kind: "friend_link", code: "QRSTUV2345" },
     { kind: "community", communityId: "c1" },
     { kind: "channel", communityId: "c 1", channelId: "ch/1" },
     { kind: "dm", conversationId: "d1" },

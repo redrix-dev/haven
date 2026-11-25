@@ -10,91 +10,58 @@ import { useNavigate } from "@solidjs/router";
 import {
   Bell,
   ChevronDown,
+  ChevronRight,
   MessageCircle,
   Plus,
   Settings,
   ShieldAlert,
   Users,
 } from "lucide-solid";
+import * as KDropdownMenu from "@kobalte/core/dropdown-menu";
 import { requireHavenSolidCore } from "@solid-client/core";
-import { useSession } from "@solid-client/contexts/SessionProvider";
 import { useVoice } from "@solid-client/contexts/VoiceProvider";
 import { Avatar } from "@solid-client/components/ui";
-import type { HavenChannel } from "@shared/nexus/community/channelTypes";
-import { openCommunitySettings } from "./settings/CommunitySettingsPanel";
-import { canOpenCommunitySettingsPanel } from "./settings/communitySettingsAccess";
-import * as KDropdownMenu from "@kobalte/core/dropdown-menu";
+import { openCommunitySettings } from "@solid-client/data/screen";
+import type { Channel, ChannelCategory } from "@shared/lib/backend/records";
+import { myCommunities } from "@shared/collections/communities/selectors";
+import { communityChannels } from "@shared/collections/channels/selectors";
+import { isMuted, unreadCount } from "@shared/collections/channels/selectors";
+import {
+  categoriesOf,
+  isCollapsed,
+} from "@shared/collections/categories/selectors";
+import {
+  openCommunityId,
+  openChannelId,
+} from "@shared/collections/session/selectors";
+import { waitingReportCount } from "@shared/collections/reports/selectors";
+import { outranks } from "@shared/collections/roles/selectors";
+import { selectChannelParticipants } from "@shared/collections/voice/voice";
 
-// ─── data wiring ─────────────────────────────────────────────────────────────
-//
-// `requireHavenSolidCore()` hands us the already-bootstrapped core. The channel
-// nexus owns its own projections, so we just ask it for the slices we need.
-//
-// Active community/channel are read from the nexus but written by the route:
-// the sidebar NAVIGATES, and CommunityRouteSync writes the active ids from the
-// URL params. The URL is the single source of truth for where you are.
-
-function useSidebarData() {
-  const core = requireHavenSolidCore();
-
-  const communities = core.communities.orderedCommunities();
-  const activeCommunityId = () => core.communities.activeCommunityId();
-  const activeChannelId = () => core.channels.activeChannelId();
-
-  // The channels projection re-derives whenever the active community changes;
-  // passing the getter keeps it reactive to community switches.
-  const channels = core.channels.channels(() => activeCommunityId() ?? "");
-
-  const unreadNotifications = core.notifications.inboxUnreadCount();
-
-  // Modmail is visible only to viewers who can moderate at least one community.
-  const canAccessModmail = createMemo(() => {
-    const byCommunity = core.permissions.getPermissionsByCommunityId();
-    return Object.keys(byCommunity).some(
-      (id) => byCommunity[id]?.canManageReports,
-    );
-  });
-  const modmailOpenCount = core.moderation.openCount();
-
-  return {
-    communities,
-    activeCommunityId,
-    channels,
-    activeChannelId,
-    unreadNotifications,
-    canAccessModmail,
-    modmailOpenCount,
-  };
-}
-
-// ─── component ───────────────────────────────────────────────────────────────
-
+/**
+ * The rail of communities and the open community's channels. The sidebar
+ * navigates; the route opens (CommunityRouteSync), so the URL stays the one
+ * answer to "where am I".
+ */
 export function CommunitySidebar() {
-  const {
-    communities,
-    activeCommunityId,
-    channels,
-    activeChannelId,
-    unreadNotifications,
-    canAccessModmail,
-    modmailOpenCount,
-  } = useSidebarData();
+  const core = requireHavenSolidCore();
   const navigate = useNavigate();
-
-  const textChannels = createMemo(() =>
-    channels().filter((c) => c.kind === "text"),
+  const communities = createMemo(() => myCommunities(core.stores.communities));
+  const activeCommunityId = () => openCommunityId(core.stores.session);
+  const moderated = createMemo(() =>
+    communities()
+      .map((c) => c.id)
+      .filter((id) => core.communities.can(id, "manage_reports")),
   );
-  const voiceChannels = createMemo(() =>
-    channels().filter((c) => c.kind === "voice"),
-  );
-
-  const activeCommunityName = createMemo(
-    () => communities().find((c) => c.id === activeCommunityId())?.name ?? "",
-  );
+  const unseen = () => core.stores.notifications.unseen;
+  const waitingReports = () =>
+    moderated().reduce(
+      (sum, id) => sum + waitingReportCount(core.stores.reports, id),
+      0,
+    );
 
   return (
     <div class="flex h-full">
-      {/* ── community rail ───────────────────────────────────────────────── */}
       <nav class="flex w-16 flex-col items-center gap-2 bg-sidebar py-3">
         <For each={communities()}>
           {(community) => (
@@ -121,163 +88,201 @@ export function CommunitySidebar() {
         </button>
 
         <div class="mt-auto">
-          <button
+          <RailButton
             title="Notifications"
             onClick={() => navigate("/notifications")}
-            class="relative mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
+            badge={unseen()}
           >
             <Bell size={20} />
-            <Show when={unreadNotifications() > 0}>
-              <span class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                {unreadNotifications() > 99 ? "99+" : unreadNotifications()}
-              </span>
-            </Show>
-          </button>
-          <button
-            title="Friends"
-            onClick={() => navigate("/friends")}
-            class="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
-          >
+          </RailButton>
+          <RailButton title="Friends" onClick={() => navigate("/friends")}>
             <Users size={20} />
-          </button>
-          <button
+          </RailButton>
+          <RailButton
             title="Direct messages"
             onClick={() => navigate("/direct-messages")}
-            class="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
           >
             <MessageCircle size={20} />
-          </button>
-          <Show when={canAccessModmail()}>
-            <button
+          </RailButton>
+          <Show when={moderated().length > 0}>
+            <RailButton
               title="Modmail"
               onClick={() => navigate("/modmail")}
-              class="relative mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
+              badge={waitingReports()}
+              danger
             >
               <ShieldAlert size={20} />
-              <Show when={modmailOpenCount() > 0}>
-                <span class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
-                  {modmailOpenCount() > 99 ? "99+" : modmailOpenCount()}
-                </span>
-              </Show>
-            </button>
+            </RailButton>
           </Show>
-          <button
+          <RailButton
             title="Settings"
             onClick={() => navigate("/settings/appearance")}
-            class="flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
           >
             <Settings size={20} />
-          </button>
+          </RailButton>
         </div>
       </nav>
 
-      {/* ── channel list ─────────────────────────────────────────────────── */}
       <Show
         when={activeCommunityId()}
+        keyed
         fallback={
           <div class="flex w-56 items-center justify-center bg-surface-panel text-sm text-muted-foreground">
             Select a community
           </div>
         }
       >
-        {(communityId) => (
-          <CommunityChannelList
-            communityId={communityId()}
-            communityName={activeCommunityName()}
-            textChannels={textChannels()}
-            voiceChannels={voiceChannels()}
-            activeChannelId={activeChannelId()}
-            onNavigateChannel={(channelId) =>
-              navigate(`/community/${communityId()}/channel/${channelId}`)
-            }
-          />
-        )}
+        {(communityId) => <CommunityChannelList communityId={communityId} />}
       </Show>
     </div>
   );
 }
 
-// Small internal components — not exported, not in components/ui/ because
-// nothing outside this feature needs them.
-
-function CommunityChannelList(props: {
-  communityId: string;
-  communityName: string;
-  textChannels: HavenChannel[];
-  voiceChannels: HavenChannel[];
-  activeChannelId: string | null;
-  onNavigateChannel: (channelId: string) => void;
+function RailButton(props: {
+  title: string;
+  onClick: () => void;
+  badge?: number;
+  danger?: boolean;
+  children: import("solid-js").JSX.Element;
 }) {
+  return (
+    <button
+      title={props.title}
+      onClick={() => props.onClick()}
+      class="relative mb-2 flex h-12 w-12 items-center justify-center rounded-2xl text-body-soft transition-all hover:rounded-xl hover:bg-sidebar-accent hover:text-foreground"
+    >
+      {props.children}
+      <Show when={(props.badge ?? 0) > 0}>
+        <span
+          class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold"
+          classList={{
+            "bg-primary text-primary-foreground": !props.danger,
+            "bg-destructive text-destructive-foreground": props.danger,
+          }}
+        >
+          {(props.badge ?? 0) > 99 ? "99+" : props.badge}
+        </span>
+      </Show>
+    </button>
+  );
+}
+
+/** One group of channels: those without a category first, then each category. */
+type ChannelGroup = { category: ChannelCategory | null; channels: Channel[] };
+
+function CommunityChannelList(props: { communityId: string }) {
   const core = requireHavenSolidCore();
+  const navigate = useNavigate();
+  const community = () => core.stores.communities.byId[props.communityId];
+  const activeChannelId = () => openChannelId(core.stores.session);
 
-  const canManage = () =>
-    canOpenCommunitySettingsPanel(
-      core.permissions.getPermissions(props.communityId),
-    );
-
-  createEffect(() => {
-    void core.ensureCommunityPermissions(props.communityId);
+  const groups = createMemo<ChannelGroup[]>(() => {
+    const channels = communityChannels(core.stores.channels, props.communityId);
+    const categories = categoriesOf(core.stores.categories, props.communityId);
+    const known = new Set(categories.map((c) => c.id));
+    return [
+      {
+        category: null,
+        channels: channels.filter(
+          (c) => c.category_id === null || !known.has(c.category_id),
+        ),
+      },
+      ...categories.map((category) => ({
+        category,
+        channels: channels.filter((c) => c.category_id === category.id),
+      })),
+    ].filter((group) => group.category !== null || group.channels.length > 0);
   });
+
+  const voiceChannelIds = createMemo(() =>
+    communityChannels(core.stores.channels, props.communityId)
+      .filter((c) => c.kind === "voice")
+      .map((c) => c.id),
+  );
 
   return (
     <div class="flex w-56 flex-col bg-surface-panel">
-      <Show
-        when={canManage()}
-        fallback={
-          <div class="flex h-12 shrink-0 items-center border-b border-border px-4">
-            <span class="font-semibold text-foreground">
-              {props.communityName}
-            </span>
-          </div>
-        }
+      <button
+        type="button"
+        title="Community settings"
+        onClick={() => openCommunitySettings(props.communityId)}
+        class="flex h-12 shrink-0 items-center gap-1 border-b border-border px-4 text-left transition-colors hover:bg-surface-hover"
       >
-        <button
-          type="button"
-          title="Community settings"
-          onClick={() => openCommunitySettings()}
-          class="flex h-12 shrink-0 items-center gap-1 border-b border-border px-4 text-left transition-colors hover:bg-surface-hover"
-        >
-          <span class="min-w-0 flex-1 truncate font-semibold text-foreground">
-            {props.communityName}
-          </span>
-          <ChevronDown size={16} class="shrink-0 text-muted-foreground" />
-        </button>
-      </Show>
+        <span class="min-w-0 flex-1 truncate font-semibold text-foreground">
+          {community()?.name}
+        </span>
+        <ChevronDown size={16} class="shrink-0 text-muted-foreground" />
+      </button>
 
       <div class="flex-1 overflow-y-auto px-2 py-2">
-        <Show when={props.textChannels.length > 0}>
-          <p class="mb-1 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Text Channels
-          </p>
-          <For each={props.textChannels}>
-            {(channel) => (
-              <ChannelRow
-                label={channel.name}
-                prefix="#"
-                active={props.activeChannelId === channel.id}
-                onClick={() => props.onNavigateChannel(channel.id)}
-              />
-            )}
-          </For>
-        </Show>
-
-        <Show when={props.voiceChannels.length > 0}>
-          <p class="mb-1 mt-3 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Voice Channels
-          </p>
-          <For each={props.voiceChannels}>
-            {(channel) => (
-              <VoiceChannelRow
-                channel={channel}
-                communityId={props.communityId}
-              />
-            )}
-          </For>
-          <VoicePresenceSubscriptions
-            communityId={props.communityId}
-            channelIds={props.voiceChannels.map((c) => c.id)}
-          />
-        </Show>
+        <For each={groups()}>
+          {(group) => (
+            <div class="mb-2">
+              <Show when={group.category}>
+                {(category) => (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void core.categories.setCollapsed(
+                        category().id,
+                        !isCollapsed(core.stores.categories, category().id),
+                      )
+                    }
+                    class="flex w-full items-center gap-1 px-1 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                  >
+                    <Show
+                      when={isCollapsed(core.stores.categories, category().id)}
+                      fallback={<ChevronDown size={12} />}
+                    >
+                      <ChevronRight size={12} />
+                    </Show>
+                    <span class="truncate">{category().name}</span>
+                  </button>
+                )}
+              </Show>
+              <For
+                each={group.channels.filter(
+                  (channel) =>
+                    !group.category ||
+                    !isCollapsed(core.stores.categories, group.category.id) ||
+                    channel.id === activeChannelId() ||
+                    unreadCount(core.stores.channels, channel.id) > 0,
+                )}
+              >
+                {(channel) => (
+                  <Show
+                    when={channel.kind === "voice"}
+                    fallback={
+                      <ChannelRow
+                        label={channel.name ?? ""}
+                        prefix="#"
+                        active={activeChannelId() === channel.id}
+                        unread={
+                          unreadCount(core.stores.channels, channel.id) > 0 &&
+                          !isMuted(core.stores.channels, channel.id)
+                        }
+                        onClick={() =>
+                          navigate(
+                            `/community/${props.communityId}/channel/${channel.id}`,
+                          )
+                        }
+                      />
+                    }
+                  >
+                    <VoiceChannelRow
+                      channel={channel}
+                      communityId={props.communityId}
+                    />
+                  </Show>
+                )}
+              </For>
+            </div>
+          )}
+        </For>
+        <VoicePresenceSubscriptions
+          communityId={props.communityId}
+          channelIds={voiceChannelIds()}
+        />
       </div>
     </div>
   );
@@ -287,50 +292,50 @@ function ChannelRow(props: {
   label: string;
   prefix: string;
   active: boolean;
-  disabled?: boolean;
+  unread?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
       onClick={() => props.onClick?.()}
-      disabled={props.disabled}
-      class="flex w-full items-center gap-2 rounded px-2 py-1 text-sm text-body-soft hover:bg-surface-list-hover hover:text-foreground disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
-      classList={{ "bg-surface-row-selected text-foreground": props.active }}
+      class="flex w-full items-center gap-2 rounded px-2 py-1 text-sm text-body-soft hover:bg-surface-list-hover hover:text-foreground"
+      classList={{
+        "bg-surface-row-selected text-foreground": props.active,
+        "font-semibold text-foreground": props.unread && !props.active,
+      }}
     >
       <span class="text-muted-foreground">{props.prefix}</span>
-      {props.label}
+      <span class="min-w-0 flex-1 truncate text-left">{props.label}</span>
+      <Show when={props.unread && !props.active}>
+        <span class="h-2 w-2 shrink-0 rounded-full bg-foreground" />
+      </Show>
     </button>
   );
 }
 
 // A voice channel row: click to join, occupants listed underneath (live from
 // the presence subscriptions below).
-function VoiceChannelRow(props: {
-  channel: HavenChannel;
-  communityId: string;
-}) {
+function VoiceChannelRow(props: { channel: Channel; communityId: string }) {
   const core = requireHavenSolidCore();
-  const { session } = useSession();
   const { voice, joinChannel } = useVoice();
-  const viewerProfile = core.profiles.viewerProfile(
-    () => session()?.user.id ?? null,
-  );
-  const occupants = core.voice.channelVoiceParticipants(() => props.channel.id);
+  const occupants = () =>
+    selectChannelParticipants(core.stores.voice, props.channel.id) ?? [];
   const isActive = () => voice.activeChannel?.channelId === props.channel.id;
   // Room participants are remotes only — the viewer appears via this row.
   const showSelf = () => isActive() && (voice.joined || voice.joining);
+  const me = () => core.userId ?? "";
 
   return (
     <div>
       <ChannelRow
-        label={props.channel.name}
+        label={props.channel.name ?? ""}
         prefix="♪"
         active={isActive()}
         onClick={() =>
           void joinChannel({
             communityId: props.communityId,
             channelId: props.channel.id,
-            channelName: props.channel.name,
+            channelName: props.channel.name ?? "",
           })
         }
       />
@@ -338,11 +343,11 @@ function VoiceChannelRow(props: {
         <div class="mb-1 ml-6 flex flex-col gap-0.5">
           <Show when={showSelf()}>
             <OccupantRow
-              name={viewerProfile()?.username ?? "You"}
-              avatarUrl={viewerProfile()?.avatarUrl ?? null}
+              name={core.nameOf(me(), props.communityId)}
+              avatarUrl={core.avatarUrl(me())}
               speaking={false}
               isSelf={true}
-              userId={session()?.user.id ?? ""}
+              userId={me()}
               communityId={props.communityId}
               channelId={props.channel.id}
             />
@@ -403,17 +408,22 @@ function OccupantRow(props: {
   // You don't get a menu on yourself.
   if (props.isSelf) return row();
 
-  // The menu's actions only work in the channel you're connected to: kick needs
-  // the live kick-broadcast channel (which only exists while joined), and volume
-  // only matters for audio you're actually receiving. Gate via <Show> (reactive)
-  // — NOT an early return — so the menu appears the instant you join and
-  // collapses back to a plain row when you leave.
+  // The menu's actions only work in the channel you're connected to. Gate via
+  // <Show> (reactive), not an early return, so the menu appears the instant
+  // you join and collapses back to a plain row when you leave.
   const inThisChannel = () =>
     voice.joined && voice.activeChannel?.channelId === props.channelId;
 
   const volume = () => voice.memberVolumes[props.userId] ?? 100;
-  const canKick = () =>
-    core.permissions.getPermissions(props.communityId).canManageMembers;
+  // The database decides; this only hides what it would refuse.
+  const canDisconnect = () => {
+    const community = core.stores.communities.byId[props.communityId];
+    return (
+      !!community &&
+      core.communities.can(props.communityId, "manage_members") &&
+      outranks(core.stores.roles, community, core.userId ?? "", props.userId)
+    );
+  };
 
   return (
     <Show when={inThisChannel()} fallback={row()}>
@@ -439,7 +449,7 @@ function OccupantRow(props: {
                 class="w-full"
               />
             </div>
-            <Show when={canKick()}>
+            <Show when={canDisconnect()}>
               <KDropdownMenu.Item
                 class="mt-1 flex cursor-pointer select-none items-center gap-2 rounded px-2 py-1.5 text-sm text-destructive outline-hidden data-highlighted:bg-destructive data-highlighted:text-primary-foreground"
                 onSelect={() =>
@@ -471,10 +481,9 @@ function VoicePresenceSubscriptions(props: {
     const communityId = props.communityId;
     const channelIds = props.channelIds;
     const activeChannelId = voice.activeChannel?.channelId ?? null;
-    // ...then run the imperative subscribe untracked. subscribePresenceChannels
-    // reads participantsByChannelId (retainChannelParticipants) and its syncs
-    // WRITE it — without untrack, those writes become dependencies of this
-    // effect and every presence sync re-subscribes forever (infinite loop).
+    // ...then subscribe untracked. subscribePresenceChannels reads the rosters
+    // and its syncs WRITE them; tracked, every presence sync would
+    // re-subscribe forever.
     const dispose = untrack(() =>
       core.voice.subscribePresenceChannels({
         communityId,

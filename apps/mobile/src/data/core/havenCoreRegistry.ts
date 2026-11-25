@@ -1,5 +1,5 @@
 import { HavenReactCore, type HavenReactCoreOptions } from "./HavenReactCore";
-import { registerHavenCore as setHavenCoreRef } from "./havenCoreRef";
+import { registerHavenCore } from "./havenCoreRef";
 export {
   getHavenCore,
   registerHavenCore,
@@ -7,14 +7,11 @@ export {
   resetHavenCore,
 } from "./havenCoreRef";
 
-/** Create the React-platform session composition root. */
+/** Create mobile's HavenCore and make it the one `requireHavenCore` returns. */
 export function createReactHavenCore(
   options: HavenReactCoreOptions,
 ): HavenReactCore {
   const core = new HavenReactCore(options);
-  setHavenCoreRef(core);
+  registerHavenCore(core);
   return core;
 }
-
-/** @deprecated Use createReactHavenCore */
-export const createHavenCore = createReactHavenCore;

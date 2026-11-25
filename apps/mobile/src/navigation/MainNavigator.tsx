@@ -1,4 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
+import type { VoiceKickPayload } from "@shared/features/voice/types";
+import { VoiceControlNotice } from "@/features/voice/VoiceControlNotice";
 import type { NavigationProp } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
@@ -12,47 +14,30 @@ import type {
   RootStackParamList,
 } from "@/navigation/types";
 import { NAV_THEME } from "@/lib/theme";
-import { setMobileNavigationDelegate } from "@/lib/registerMobileAppHost";
-import { toChannel, toServerSummaries } from "@shared/core";
 import {
-  bootstrapNotificationSoundSync,
-  createNotificationSoundSyncState,
-  requireHavenCore,
-  resetNotificationSoundSyncState,
-  syncFocusFromRoute,
-  syncNotificationSounds,
+  communityChannels,
+  conversations,
+  isMuted,
+  unreadCount,
+} from "@shared/collections/channels/selectors";
+import {
+  openChannelId,
+  openCommunityId,
+} from "@shared/collections/session/selectors";
+import { incomingRequests } from "@shared/collections/social/selectors";
+import {
+  useAvatarUrl,
   useHavenCore,
+  useMe,
+  useNameOf,
+  useStore,
 } from "@mobile-data";
-import {
-  useActiveChannelId,
-  useActiveCommunityId,
-  useChannels,
-  useCounts,
-  useDmConversations,
-  useNotifications,
-  useOrderedCommunities,
-  useProfilesRecord,
-  useViewerProfile,
-} from "@mobile-data/hooks";
-import { MOBILE_DEFAULT_NOTIFICATION_AUDIO } from "@/constants/mobileNotificationAudioDefaults";
-import UserProfileModal, {
-  type UserProfileModalTarget,
-} from "@/features/user-profile/UserProfileModal";
-import { useUiStore } from "@mobile-data/session/uiStore";
-import { useAuthStore } from "@mobile-data/session/authStore";
-import type { VoiceSidebarParticipant } from "@shared/types/types";
-import type { NotificationAudioSettings } from "@shared/types/settings";
+import { PeopleProvider } from "@/features/people/PeopleProvider";
 import { useVoice } from "@/features/voice/hooks/useVoice";
-import {
-  type LiveProfilesRecord,
-  resolveLiveAvatarUrl,
-  resolveLiveUsername,
-} from "@shared/lib/liveProfiles";
 import { useMobilePushNotificationRouting } from "@/hooks/useMobilePushNotificationRouting";
 import { useMobilePushNavigationStore } from "@/stores/mobilePushNavigationStore";
 import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { resolveColorProp } from "@shared/themes";
-import { countFilteredUnreadInInbox } from "@shared/features/notifications/inboxNotificationFilter";
 import { VoiceJoinPromptSheet } from "@/features/voice/VoiceJoinPromptSheet";
 import { VoiceSessionSheet } from "@/features/voice/VoiceSessionSheet";
 import { VoiceFloatingController } from "@/features/voice/VoiceFloatingController";
@@ -68,6 +53,7 @@ import { NotificationsScreen } from "@/screens/main/NotificationsScreen";
 import { ProfileScreen } from "@/screens/main/ProfileScreen";
 import { SettingsScreen } from "@/screens/main/SettingsScreen";
 import { FriendsScreen } from "@/screens/main/FriendsScreen";
+import { FriendLinkScreen } from "@/screens/main/FriendLinkScreen";
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
 
@@ -82,204 +68,38 @@ function logVoiceJoinPromptTiming(
   console.info("[voice:join]", label, details ?? {});
 }
 
-type VoiceParticipantIdentity = {
-  userId: string;
-  displayName: string;
-  avatarUrl?: string | null;
-};
-
-function enrichVoiceParticipant<T extends VoiceParticipantIdentity>(
-  participant: T,
-  liveProfiles: LiveProfilesRecord,
-): T {
-  const displayName =
-    resolveLiveUsername(
-      liveProfiles,
-      participant.userId,
-      participant.displayName,
-    ) ?? participant.displayName;
-  const avatarUrl =
-    resolveLiveAvatarUrl(
-      liveProfiles,
-      participant.userId,
-      participant.avatarUrl ?? null,
-    ) ??
-    participant.avatarUrl ??
-    null;
-
-  if (
-    displayName === participant.displayName &&
-    avatarUrl === (participant.avatarUrl ?? null)
-  ) {
-    return participant;
-  }
-
-  return { ...participant, displayName, avatarUrl };
-}
-
-function enrichVoiceParticipantRecord(
-  participantsByChannelId: Record<string, VoiceSidebarParticipant[]>,
-  liveProfiles: LiveProfilesRecord,
-): Record<string, VoiceSidebarParticipant[]> {
-  return Object.fromEntries(
-    Object.entries(participantsByChannelId).map(([channelId, participants]) => [
-      channelId,
-      participants.map((participant) =>
-        enrichVoiceParticipant(participant, liveProfiles),
-      ),
-    ]),
-  );
-}
-
-/**
- * Bridges React Navigation imperative API into the shared AppHost so external
- * events (notification taps, deep links, access-revoked redirects) can move
- * the user without a navigation ref reaching into shared code.
- */
-function MainNavigationDelegateBridge({
-  onNavigateToDm,
-}: {
-  onNavigateToDm: (conversationId: string) => void;
-}) {
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-
-  useEffect(() => {
-    setMobileNavigationDelegate({
-      navigateToCommunity: (serverId, channelId) => {
-        try {
-          requireHavenCore().communities.setActiveId(serverId);
-          if (channelId) {
-            requireHavenCore().channels.setActiveChannelId(channelId);
-          }
-        } catch {
-          // HavenCore may not be ready during cold-start race; navigation alone is fine.
-        }
-        navigation.navigate("Main", {
-          screen: "Community",
-          params: { serverId },
-        });
-      },
-      navigateToDm: (conversationId) => {
-        onNavigateToDm(conversationId);
-      },
-    });
-    return () => setMobileNavigationDelegate(null);
-  }, [navigation, onNavigateToDm]);
-
-  return null;
-}
-
-function MobileNotificationSoundSync({
-  userId,
-  audioSettings,
-}: {
-  userId: string;
-  audioSettings: NotificationAudioSettings;
-}) {
-  const core = useHavenCore();
-  const notificationItems = useNotifications(core.notifications);
-  const soundSyncRef = useRef(createNotificationSoundSyncState());
-  const audioRef = useRef(audioSettings);
-
-  useEffect(() => {
-    audioRef.current = audioSettings;
-  }, [audioSettings]);
-
-  useEffect(() => {
-    if (!userId) {
-      resetNotificationSoundSyncState(soundSyncRef.current);
-      return;
-    }
-    void bootstrapNotificationSoundSync(core, soundSyncRef.current);
-  }, [core, userId]);
-
-  useEffect(() => {
-    if (!userId || !soundSyncRef.current.bootstrapped) return;
-    void syncNotificationSounds(
-      core,
-      audioRef.current,
-      soundSyncRef.current,
-    ).catch((error) => {
-      console.error("Failed to play notification sounds:", error);
-    });
-  }, [core, notificationItems.length, userId]);
-
-  return null;
-}
-
 function MainNavigationShell({ userId }: { userId: string }) {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const core = useHavenCore();
-  const dm = core.directMessages;
-  const authUser = useAuthStore((s) => s.user);
-  const setWorkspaceMode = useUiStore((s) => s.setWorkspaceMode);
-  const notificationItems = useNotifications(core.notifications);
-  const dmConversations = useDmConversations(dm);
-  const socialCounts = useCounts(core.social);
-  const currentServerId = useActiveCommunityId(core.communities);
-  const currentChannelId = useActiveChannelId(core.channels);
-  const activeCommunityChannels = useChannels(
-    core.channels,
-    currentServerId ?? "__none__",
-  );
-  const channels = useMemo(
-    () => activeCommunityChannels.map(toChannel),
-    [activeCommunityChannels],
+  const currentServerId = useStore("session", openCommunityId);
+  const currentChannelId = useStore("session", openChannelId);
+  const channels = useStore("channels", (s) =>
+    currentServerId ? communityChannels(s, currentServerId) : [],
   );
   const setCurrentChannelId = useCallback(
     (id: string | null) => {
-      core.channels.setActiveChannelId(id);
+      if (currentServerId && id) void core.openChannel(currentServerId, id);
     },
-    [core],
-  );
-  const viewerProfile = useViewerProfile(core.profiles, userId);
-  const liveProfiles = useProfilesRecord(core.profiles);
-  const orderedCommunities = useOrderedCommunities(core.communities);
-  const servers = useMemo(
-    () => toServerSummaries(orderedCommunities),
-    [orderedCommunities],
+    [core, currentServerId],
   );
   useMobilePushNotificationRouting();
 
-  useEffect(() => {
-    void core.profiles.ensureViewerProfile(userId).catch(() => {
-      // The auth email fallback keeps voice usable if profile hydration fails.
-    });
-  }, [core.profiles, userId]);
+  const currentUserIdentity = {
+    id: userId,
+    displayName: useNameOf(userId),
+    avatarUrl: useAvatarUrl(userId),
+  };
 
-  const currentUserIdentity = useMemo(() => {
-    const email = authUser?.email ?? null;
-    const fallbackName =
-      viewerProfile?.username ?? email?.split("@")[0]?.trim() ?? "User";
-    const displayName =
-      resolveLiveUsername(liveProfiles, userId, fallbackName) ?? fallbackName;
-    const avatarUrl =
-      resolveLiveAvatarUrl(
-        liveProfiles,
-        userId,
-        viewerProfile?.avatarUrl ?? null,
-      ) ??
-      viewerProfile?.avatarUrl ??
-      null;
-
-    return {
-      id: userId,
-      displayName,
-      avatarUrl,
-    };
-  }, [authUser?.email, liveProfiles, userId, viewerProfile]);
-
-  const notificationsUnreadCount = useMemo(
-    () => countFilteredUnreadInInbox(notificationItems),
-    [notificationItems],
+  const notificationsUnreadCount = useStore("notifications", (s) => s.unseen);
+  const dmUnreadCount = useStore("channels", (s) =>
+    conversations(s).reduce(
+      (total, c) => total + (isMuted(s, c.id) ? 0 : unreadCount(s, c.id)),
+      0,
+    ),
   );
-  const dmUnreadCount = useMemo(
-    () =>
-      dmConversations.reduce(
-        (total, conversation) => total + conversation.unreadCount,
-        0,
-      ),
-    [dmConversations],
+  const friendRequestCount = useStore(
+    "social",
+    (s) => incomingRequests(s, userId).length,
   );
 
   const mobileVoiceSettings = useMobileVoiceSettings();
@@ -429,19 +249,56 @@ function MainNavigationShell({ userId }: { userId: string }) {
     [dismissVoiceSheet, disconnectVoiceSession],
   );
 
-  const handleVoiceKick = useCallback(() => {
-    dismissVoiceSheet();
-    void forceDisconnectVoice("kicked")
-      .then(() => {
+  const handleVoiceKick = useCallback(
+    (payload: VoiceKickPayload) => {
+      dismissVoiceSheet();
+      void forceDisconnectVoice("kicked")
+        .then(() => {
+          Alert.alert(
+            "Removed from voice",
+            `You've been removed from ${payload.channelName ?? "the voice channel"} by ${payload.kickedByName ?? "a moderator"}.`,
+            [{ text: "OK", onPress: () => core.voice.dismissControlNotice() }],
+          );
+        })
+        .catch((error: unknown) => {
+          console.warn("[voice] Failed to disconnect after kick.", error);
+        });
+    },
+    [core.voice, dismissVoiceSheet, forceDisconnectVoice],
+  );
+
+  // Losing a community (left elsewhere, removed, banned, deleted): the core
+  // has already forgotten it, so its name is remembered here. Leave its voice
+  // channel and say why; the community shell moves off it.
+  const communityNames = useStore("communities", (s) => s.byId);
+  const namesRef = useRef(new Map<string, string>());
+  useEffect(() => {
+    for (const community of Object.values(communityNames)) {
+      namesRef.current.set(community.id, community.name);
+    }
+  }, [communityNames]);
+  useEffect(() => {
+    core.listen({
+      communityGone: (communityId) => {
+        const voice = core.stores.voice.getState();
+        if (voice.activeChannel?.community_id === communityId) {
+          dismissVoiceSheet();
+          void forceDisconnectVoice("access_lost").catch((error: unknown) => {
+            console.warn(
+              "[voice] Failed to disconnect after access loss.",
+              error,
+            );
+          });
+        }
+        const name = namesRef.current.get(communityId);
+        namesRef.current.delete(communityId);
         Alert.alert(
-          "Removed from voice",
-          "You were removed from the voice channel.",
+          "No longer in a community",
+          name ? `You're no longer in ${name}.` : undefined,
         );
-      })
-      .catch((error: unknown) => {
-        console.warn("[voice] Failed to disconnect after kick.", error);
-      });
-  }, [dismissVoiceSheet, forceDisconnectVoice]);
+      },
+    });
+  }, [core, dismissVoiceSheet, forceDisconnectVoice]);
 
   const handleVoiceInterrupted = useCallback(() => {
     setInterruptionNoticeVisible(true);
@@ -557,28 +414,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
     ],
   );
 
-  const activeVoiceCommunityName = useMemo(() => {
+  const activeVoiceCommunityName = useStore("communities", (s) => {
     const communityId = voiceDerived.activeVoiceChannel?.community_id;
-    if (!communityId) return null;
-    return servers.find((server) => server.id === communityId)?.name ?? null;
-  }, [servers, voiceDerived.activeVoiceChannel]);
-  const enrichedVoiceChannelParticipants = useMemo(
-    () =>
-      enrichVoiceParticipantRecord(
-        voiceDerived.voiceChannelParticipants,
-        liveProfiles,
-      ),
-    [liveProfiles, voiceDerived.voiceChannelParticipants],
-  );
-  const enrichedVoiceControllerState = useMemo(
-    () => ({
-      ...voiceController.state,
-      participants: voiceController.state.participants.map((participant) =>
-        enrichVoiceParticipant(participant, liveProfiles),
-      ),
-    }),
-    [liveProfiles, voiceController.state],
-  );
+    return communityId ? (s.byId[communityId]?.name ?? null) : null;
+  });
+  const enrichedVoiceControllerState = voiceController.state;
 
   const handleOpenFriendsFromNotification = useCallback(
     (input: {
@@ -596,74 +436,39 @@ function MainNavigationShell({ userId }: { userId: string }) {
     [navigation],
   );
 
-  const handleOpenDmWithUser = useCallback(
-    async (targetUserId: string) => {
-      const conversationId = await dm.openWithUser(targetUserId);
-      navigation.navigate("Main", {
-        screen: "Community",
-        params: {
-          pendingDmConversationId: conversationId,
-          serverId: null,
-          openDrawer: false,
-        },
-      });
-    },
-    [dm, navigation],
-  );
-
-  const [profileCardTarget, setProfileCardTarget] =
-    useState<UserProfileModalTarget | null>(null);
-  const handleOpenProfileCard = useCallback(
-    (target: UserProfileModalTarget) => {
-      setProfileCardTarget(target);
-    },
-    [],
-  );
-  const handleCloseProfileCard = useCallback(() => {
-    setProfileCardTarget(null);
-  }, []);
-
   const handleNavigateToDm = useCallback(
     (conversationId: string) => {
       navigation.navigate("Main", {
         screen: "Community",
         params: {
           pendingDmConversationId: conversationId,
-          serverId: null,
+          serverId:
+            core.stores.session.getState().place?.kind === "community"
+              ? openCommunityId(core.stores.session.getState())
+              : null,
           openDrawer: false,
         },
       });
     },
-    [navigation],
+    [core, navigation],
   );
 
   // Push taps and links (features/links) both navigate through these.
   useEffect(() => {
     useMobilePushNavigationStore.getState().setHandlers({
-      openDm: (conversationId) => {
-        navigation.navigate("Main", {
-          screen: "Community",
-          params: {
-            pendingDmConversationId: conversationId,
-            serverId: null,
-            openDrawer: false,
-          },
-        });
-      },
+      openDm: handleNavigateToDm,
       openFriends: (input) => {
         handleOpenFriendsFromNotification(input);
       },
       openMention: (communityId, channelId) => {
-        setWorkspaceMode("community");
-        syncFocusFromRoute(core, { communityId, channelId });
+        void core.openChannel(communityId, channelId);
         navigation.navigate("Main", {
           screen: "Community",
           params: { serverId: communityId, openDrawer: false },
         });
       },
       openCommunity: (communityId) => {
-        setWorkspaceMode("community");
-        syncFocusFromRoute(core, { communityId });
+        void core.openCommunity(communityId);
         navigation.navigate("Main", {
           screen: "Community",
           params: { serverId: communityId, openDrawer: true },
@@ -674,36 +479,27 @@ function MainNavigationShell({ userId }: { userId: string }) {
         navigation.navigate("Main", {
           screen: "Community",
           params: {
-            serverId: core.communities.getActiveId(),
+            serverId: openCommunityId(core.stores.session.getState()),
             openDrawer: false,
             pendingInviteCode: code,
           },
         });
       },
+      openFriendLink: (code) => {
+        navigation.navigate("Main", { screen: "FriendLink", params: { code } });
+      },
       openNotifications: () => {
         navigation.navigate("Main", { screen: "Notifications" });
-      },
-      refreshUrgentSurfaces: () => {
-        void dm.loadConversations();
-        void core.social.load();
-        void core.notifications.refreshInbox();
       },
     });
 
     return () => {
       useMobilePushNavigationStore.getState().setHandlers(null);
     };
-  }, [
-    core,
-    dm,
-    handleOpenFriendsFromNotification,
-    navigation,
-    setWorkspaceMode,
-  ]);
+  }, [core, handleNavigateToDm, handleOpenFriendsFromNotification, navigation]);
 
   return (
-    <>
-      <MainNavigationDelegateBridge onNavigateToDm={handleNavigateToDm} />
+    <PeopleProvider onOpenConversation={handleNavigateToDm}>
       <View className="flex-1">
         <Stack.Navigator
           initialRouteName="CommunityEntry"
@@ -726,13 +522,12 @@ function MainNavigationShell({ userId }: { userId: string }) {
                 onOpenProfile={() =>
                   navigation.navigate("Main", { screen: "Profile" })
                 }
-                onOpenProfileCard={handleOpenProfileCard}
                 onOpenNotifications={() =>
                   navigation.navigate("Main", { screen: "Notifications" })
                 }
                 notificationsUnreadCount={notificationsUnreadCount}
                 inboxUnreadCount={dmUnreadCount}
-                friendRequestCount={socialCounts.incomingPendingRequestCount}
+                friendRequestCount={friendRequestCount}
                 onOpenFriends={() => {
                   navigation.navigate("Main", {
                     screen: "Friends",
@@ -742,18 +537,7 @@ function MainNavigationShell({ userId }: { userId: string }) {
                     },
                   });
                 }}
-                onStartDirectMessage={(targetUserId) => {
-                  void handleOpenDmWithUser(targetUserId).catch((error) => {
-                    Alert.alert(
-                      "Message failed",
-                      error instanceof Error
-                        ? error.message
-                        : "Could not open that conversation.",
-                    );
-                  });
-                }}
                 activeVoiceChannelId={voiceState.activeVoiceChannelId}
-                voiceChannelParticipants={enrichedVoiceChannelParticipants}
                 onSelectVoiceChannel={handleSelectVoiceChannel}
                 onOpenVoiceSession={openVoiceSheet}
               />
@@ -762,6 +546,11 @@ function MainNavigationShell({ userId }: { userId: string }) {
           <Stack.Screen
             name="Friends"
             component={FriendsScreen}
+            options={{ animation: "slide_from_right", gestureEnabled: true }}
+          />
+          <Stack.Screen
+            name="FriendLink"
+            component={FriendLinkScreen}
             options={{ animation: "slide_from_right", gestureEnabled: true }}
           />
           <Stack.Screen
@@ -792,21 +581,6 @@ function MainNavigationShell({ userId }: { userId: string }) {
         />
       </View>
 
-      <UserProfileModal
-        visible={Boolean(profileCardTarget)}
-        target={profileCardTarget}
-        onDismiss={handleCloseProfileCard}
-        onStartDirectMessage={(targetUserId) => {
-          void handleOpenDmWithUser(targetUserId).catch((error) => {
-            Alert.alert(
-              "Message failed",
-              error instanceof Error
-                ? error.message
-                : "Could not open that conversation.",
-            );
-          });
-        }}
-      />
       <VoiceJoinPromptSheet
         prompt={voiceState.voiceJoinPrompt}
         currentChannelName={voiceDerived.activeVoiceChannel?.name ?? null}
@@ -854,15 +628,15 @@ function MainNavigationShell({ userId }: { userId: string }) {
           </Pressable>
         </View>
       </HavenListSheet>
-    </>
+    </PeopleProvider>
   );
 }
 
 export function MainNavigator() {
-  const userId = useAuthStore((s) => s.user?.id ?? null);
+  const userId = useMe();
   const themeTokens = useMobileThemeTokens();
   const spinnerFg = resolveColorProp(themeTokens, "foreground") ?? "#e6edf7";
-  useHydrateMobileThemeFromProfile(userId);
+  useHydrateMobileThemeFromProfile();
 
   if (!userId) {
     return (
@@ -874,11 +648,8 @@ export function MainNavigator() {
 
   return (
     <>
-      <MobileNotificationSoundSync
-        userId={userId}
-        audioSettings={MOBILE_DEFAULT_NOTIFICATION_AUDIO}
-      />
       <MainNavigationShell userId={userId} />
+      <VoiceControlNotice floating />
     </>
   );
 }

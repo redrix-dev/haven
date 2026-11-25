@@ -95,6 +95,10 @@ If `docs/releases/<tag>.md` is absent, the workflow falls back to a generic
 "installer below / auto-updates" body — so a missing notes file degrades safely
 rather than leaking anything.
 
+The command suite doesn't cover how the native apps feel to use. For that, build
+the same `staging` commit locally on each host as described in
+[LOCAL_NATIVE_TESTING.md](./LOCAL_NATIVE_TESTING.md).
+
 ---
 
 ## All-platforms release (coordinated)
@@ -200,9 +204,15 @@ a **custom Expo Updates-compatible OTA pipeline** (asset hashing → bundle/mani
 
 ## Release notes / changelog
 
-- Each desktop/mobile release gets human-readable notes — sourced from the
-  **public** signoff summary in `docs/releases/<tag>.md` (desktop workflow reads it
-  into the GitHub Release; mobile store notes drawn from the same file).
+- Each desktop/mobile release gets human-readable notes in
+  `docs/releases/<tag>.md`, written by a person (plus the **public** signoff
+  summary). That one file feeds everything else:
+  1. The desktop workflow reads it into the GitHub Release.
+  2. `npm run release:site-draft -- <tag>` turns it into a draft "What's new"
+     article in `../haven-site/content/releases/`. Write the tagline, read it
+     in Keystatic, and merge it on haven-site. See
+     [releases/README.md](releases/README.md#the-site-article).
+  3. Mobile store notes are drawn from the same file.
 - A top-level `CHANGELOG.md` (Keep a Changelog format, sectioned per train) is the
   durable record; web entries reference the deploy commit rather than a version.
 - Notes are written **as part of the release change**, not reconstructed after.

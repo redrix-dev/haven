@@ -21,7 +21,7 @@ Dependencies point down only:
 | `App.tsx`                 | routes, contexts, core, UI primitives, root files    |
 | `routes/`                 | feature barrels, contexts, core, UI primitives       |
 | `features/*`              | data, UI primitives, contexts, auth, core, `@shared` |
-| `contexts/`               | core, auth, data                                     |
+| `contexts/`               | core, auth, data, UI primitives                      |
 | `auth/`                   | core                                                 |
 | `core/`                   | data                                                 |
 | `data/`, `components/ui/` | `@shared` and Solid only                             |

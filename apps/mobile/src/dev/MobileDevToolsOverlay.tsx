@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Alert, Pressable, Text, View } from "react-native";
-import { bootLogger } from "@shared/debug/bootLogger";
+import { perfTrace } from "@shared/debug/perfTrace";
 import { DataCacheDebugModal } from "@/debug/DataCacheDebugModal";
 import { MobileDevThemeMenu } from "@/dev/MobileDevThemeMenu";
 
@@ -14,15 +14,13 @@ export function MobileDevToolsOverlay() {
   if (!__DEV__) return null;
 
   const showBootLog = () => {
-    const report = bootLogger.getReport();
-    // Print to Metro/console for full detail, show summary in Alert.
-
+    const report = perfTrace.getReport();
     console.log("\n" + report);
-    const events = bootLogger.getEvents();
+    const events = perfTrace.getEvents();
     const total = events[events.length - 1]?.elapsed ?? 0;
     Alert.alert(
-      "Boot Sequence",
-      `${events.length} events · ${total.toFixed(0)} ms total\n\nFull report printed to console.`,
+      "Perf trace",
+      `${events.length} events · ${total.toFixed(0)} ms since js-entry\n\nFilter device logs on haven-perf. The table was printed to the console.`,
       [{ text: "OK" }],
     );
   };

@@ -1,6 +1,6 @@
 # `features/` — vertical slices
 
-One folder per product feature (community, direct-messages, voice, settings, …),
+One folder per product feature (community, voice, settings, …),
 named to mirror `apps/mobile/src/features/` wherever the domain exists on both
 platforms. Full shape + reasoning: [docs/architecture/SOLID_CLIENT_SHAPE.md](../../../../docs/architecture/SOLID_CLIENT_SHAPE.md).
 
@@ -15,3 +15,7 @@ The lint-enforced contract (`boundaries/dependencies` in `eslint.config.mjs`):
 
 Adding a feature = new folder here + one registration in `routes/`. If the change
 also wants to touch `App.tsx`, something is in the wrong place.
+
+`community/` holds every place people talk: community channels and direct
+conversations. Since a conversation is a channel, both use one chat
+(`ChannelChat`), and splitting them would make two features share it.

@@ -1,6 +1,6 @@
 {
   "name": "haven",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "Haven",
   "private": true,
   "repository": {
@@ -10,6 +10,7 @@
   "scripts": {
     "lint": "eslint \"{apps,packages,tooling}/**/*.{js,ts,tsx}\"",
     "check:agent-skills": "node tooling/scripts/validate-agent-skills.mjs",
+    "check:supabase-cli": "node tooling/scripts/check-supabase-cli-pin.mjs",
     "check:desktop-version": "node tooling/scripts/check-desktop-version-sync.mjs",
     "check:shared-hex": "node tooling/scripts/check-shared-hex-literals.mjs",
     "check:shared-portable": "node tooling/scripts/check-shared-portable.mjs",
@@ -18,16 +19,22 @@
     "check:chat-surface": "node tooling/scripts/check-chat-surface.mjs",
     "check:mobile-uniwind": "node --test tooling/scripts/mobile/__tests__/uniwind-theme-allow.test.mjs && node tooling/scripts/mobile/check-uniwind-theme-usage.mjs",
     "check:mobile-typography": "node tooling/scripts/mobile/check-mobile-typography.mjs",
-    "test:unit": "vitest run packages/shared/src/core/__tests__ packages/shared/src/infrastructure/platform/__tests__ packages/shared/src/themes/__tests__ packages/shared/src/features/auth/domain/__tests__ packages/shared/src/features/community/utils/__tests__ packages/shared/src/features/links/__tests__ packages/shared/src/features/messaging/lib/__tests__ packages/shared/src/features/messaging/utils/__tests__ packages/shared/src/features/notifications/utils/__tests__ packages/solid-client/src/components/ui/Markdown/__tests__ packages/solid-client/src/data/direct-messages/__tests__ packages/solid-client/src/data/social/__tests__ packages/solid-client/src/data/voice/__tests__ packages/solid-client/src/features/auth/__tests__ packages/solid-client/src/features/links/__tests__ packages/solid-client/src/features/voice/__tests__ packages/solid-client/src/test-support/__tests__ apps/mobile/src/data/__tests__ apps/mobile/src/features/links/__tests__ apps/mobile/src/features/notifications/utils/__tests__",
-    "test:cleave": "npm run lint && npm run check:shared-portable && npm run typecheck && npm run mobile:typecheck && npm run mobile:bundle && npm run test:unit && npm run test:tier2",
+    "release:site-draft": "node tooling/scripts/site/draft-site-release.mjs",
+    "test:tooling": "node --test tooling/scripts/site/__tests__/draft-site-release.test.mjs",
+    "test:unit": "vitest run --exclude \"**/*.contract.test.ts\"",
+    "test:cleave": "npm run lint && npm run check:shared-portable && npm run typecheck && npm run mobile:typecheck && npm run mobile:bundle && npm run test:unit && npm run test:tooling && npm run test:tier2",
     "test:backend": "node tooling/scripts/test/run-vitest-with-local-env.mjs backend",
     "test:db:users": "node tooling/scripts/test/bootstrap-local-auth-users.mjs",
     "test:db:fixtures": "node tooling/scripts/test/run-supabase-sql-suite.mjs --fixtures-only",
     "test:db:rls": "node tooling/scripts/test/run-supabase-sql-suite.mjs",
     "test:db:quick": "node tooling/scripts/test/run-supabase-sql-suite.mjs --skip-fixtures",
+    "devdb": "node tooling/scripts/devdb/devdb.mjs",
     "test:db": "node tooling/scripts/test/run-db-suite.mjs",
+    "test:db:mutations": "node tooling/scripts/test/run-sql-mutations.mjs",
+    "test:db:auth-hook": "node tooling/scripts/test/check-auth-hook.mjs",
+    "test:functions": "node tooling/scripts/test/run-function-tests.mjs",
+    "test:functions:mutations": "node tooling/scripts/test/run-function-mutations.mjs",
     "supabase:types": "node tooling/scripts/generate-supabase-types.mjs",
-    "test:notifications:smoke": "node tooling/scripts/test/run-notification-dispatch-smoke.mjs",
     "test:signoff": "node tooling/scripts/test/generate-test-signoff.mjs",
     "test:signoff:release": "node tooling/scripts/test/generate-test-signoff.mjs --mode release",
     "test:report": "node tooling/scripts/test/generate-test-report.mjs",
@@ -37,7 +44,7 @@
     "test:all": "npm run lint && npm run check:shared-portable && npm run check:themes && npm run typecheck && npm run test:unit && npm run test:db && npm run test:backend",
     "test:ci": "npm run test:cleave && npm run test:db && npm run test:backend",
     "ci:verify": "npm run test:ci",
-    "ci:fast": "npm run format:check && npm run lint && npm run check:shared-portable && npm run typecheck && npm run test:unit",
+    "ci:fast": "npm run format:check && npm run check:supabase-cli && npm run lint && npm run check:shared-portable && npm run typecheck && npm run test:unit && npm run test:tooling",
     "ci:mobile": "npm run mobile:typecheck && npm run mobile:bundle",
     "ci:integration": "npm run test:db && npm run test:backend",
     "prepare": "husky",
@@ -89,26 +96,31 @@
   },
   "license": "MIT",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24.22.1 <25"
   },
   "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=24.22.1 <25",
+      "onFail": "error"
+    },
     "packageManager": {
       "name": "npm",
-      "version": "11.18.0",
+      "version": "11.19.1",
       "onFail": "error"
     }
   },
-  "packageManager": "npm@11.18.0",
+  "packageManager": "npm@11.19.1",
   "devDependencies": {
     "@solidjs/testing-library": "^0.8.10",
     "@tailwindcss/vite": "^4.3.0",
-    "@tauri-apps/cli": "^2.11.2",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^25.2.3",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.5",
-    "eslint-plugin-boundaries": "^6.0.2",
+    "eslint-plugin-boundaries": "^7.4.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",

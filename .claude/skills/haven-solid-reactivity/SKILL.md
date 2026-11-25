@@ -1,6 +1,6 @@
 ---
 name: haven-solid-reactivity
-description: Use when writing or changing any createEffect, createMemo, store subscription, or realtime handler in packages/solid-client — including effects that call a nexus load/open/mark method. Covers the self-retriggering effect class that strobes the UI, the untrack rule, the async-prefix trap, and the settle test every new effect ships with.
+description: Use when writing or changing any createEffect, createMemo, store subscription, or realtime handler in packages/solid-client — including effects that call a core or collection load/open/mark command. Covers the self-retriggering effect class that strobes the UI, the untrack rule, the async-prefix trap, and the settle test every new effect ships with.
 ---
 
 # Haven Solid Reactivity
@@ -8,7 +8,7 @@ description: Use when writing or changing any createEffect, createMemo, store su
 ## Read Before Editing
 
 - [docs/architecture/SOLID_CLIENT_SHAPE.md](../../../docs/architecture/SOLID_CLIENT_SHAPE.md)
-- [docs/architecture/HAVEN_CORE.md](../../../docs/architecture/HAVEN_CORE.md)
+- [docs/architecture/COLLECTIONS.md](../../../docs/architecture/COLLECTIONS.md)
 
 ## The Failure This Prevents
 
@@ -66,6 +66,13 @@ This is what makes the class near-invisible in review: the code reads as
 fire-and-forget, and it isn't. If you only remember one thing from this skill,
 remember this paragraph.
 
+**Shared collection methods read the live store.** Every collection's logic lives in
+`packages/shared`, and on Solid its `port.get()` is the live store proxy, so a
+shared method's reads before its first `await` (a cache check, a freshness
+stamp, the old value it is about to merge into) are tracked reads. Assume any
+`core.<domain>.*` command reads the store it writes, and call it inside
+`untrack` from an effect.
+
 ## Self-Check Before You Write An Effect
 
 1. What does this effect _intend_ to depend on? (Usually one or two ids.)
@@ -79,27 +86,28 @@ remember this paragraph.
 
 Defended, copy these:
 
-- [DirectMessagesView.tsx](../../../packages/solid-client/src/features/direct-messages/DirectMessagesView.tsx) — the `86a20e0` fix
-- [CommunityOverviewTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityOverviewTab.tsx) — reads props, then `untrack(() => load(id))`
-- [CommunityChannelsTab.tsx](../../../packages/solid-client/src/features/community/settings/CommunityChannelsTab.tsx) — was known-naked; defended + locked under RED-50
-- [ProfileSettings.tsx](../../../packages/solid-client/src/features/settings/ProfileSettings.tsx) — `untrack(() => void load(id))` around four `ensure*` calls
+- [CommunityRouteSync.ts](../../../packages/solid-client/src/features/community/CommunityRouteSync.ts) — tracks the route params, then `untrack(() => core.openChannel(…))`
+- [ChannelChat.tsx](../../../packages/solid-client/src/features/community/ChannelChat.tsx) — tracks what the window shows, then ensures profiles, file links and replied-to messages untracked
+- [FriendLinkView.tsx](../../../packages/solid-client/src/features/friends/FriendLinkView.tsx) — tracks the code, then `untrack(() => core.social.openLink(code))`
 
 ### A settling effect is not a defended one
 
-Measured under RED-50: every naked effect on the settings surfaces **already
-settled**, because `inflight` maps in the nexus swallowed the retrigger. They
-cost one extra effect run and one extra render, not a runaway loop.
+Measured on the collections (2026-11-15, `coreSurfaces.tier2.test.ts`):
+untracked, every screen's call runs its effect once. Naked, every one runs
+again on its own writes. Most cost one or two extra runs, because a load
+already running absorbs the retrigger. But loads that always start fresh
+(`refresh`: friend links, opening a friend link, a community's reports,
+report notes) **loop for as long as they are allowed to**. Whether a naked
+effect strobes depends on how the command it calls dedupes, an
+implementation detail one change away from flipping.
 
-So "it doesn't strobe" proves nothing. The defense was an implementation detail
-of the nexus, one dedupe away from vanishing — exactly the coincidence §5 warns
-about. Judge an effect by whether it reads a store it writes, not by whether you
-can see it misbehave.
+So "it doesn't strobe" proves nothing. Judge an effect by whether it reads a
+store it writes, not by whether you can see it misbehave.
 
 The corollary for tests: a settle test on an effect that settles either way
-asserts nothing. Assert the **run count** (naked costs 2, `untrack` costs 1) so
-removing the guard actually fails, and skip the test where no such difference
-exists — `ChannelPermissionsDialog` and `NotificationSettings` measure 1 run in
-every variant, so they carry the `untrack` fix without a settle test.
+asserts nothing. Assert the **run count** both ways: untracked is 1, naked is
+what was measured (`NAKED_RUNS` in `coreSurfaces.tier2.test.ts`). A new
+screen effect adds its call to `CASES` there.
 
 ## Ship The Test With The Effect
 
@@ -125,15 +133,16 @@ proof.
   **async** write (after an RPC/load) retriggered it. Proven finding: this class
   does **not** reproduce in a bare reactive graph — it only loops under Solid's
   real render scheduler, so the test must render (`@solidjs/testing-library`).
-  Drive the **real nexus method** (e.g. `openConversation`), not a synthetic
-  mimic — a hand-built store synthetic won't capture the exact subscription that
-  leaks. See `directMessagesLoop.tier2.test.ts`.
+  Drive the **real command** (e.g. `core.openConversation`) on a real
+  `HavenSolidCore` (`createSolidTestCore()` in `test-support/`), not a
+  synthetic mimic — a hand-built store won't capture the exact subscription
+  that leaks. See `coreSurfaces.tier2.test.ts`.
 
 **Rule of thumb:** if the retriggering write happens **after an `await`** (RPC,
 load, mark-read), it's the async class → Tier 2. If the effect blows the stack
 synchronously, it's Tier 1. When unsure, Tier 2 — it catches both.
 
-Nexus-side store writes belong to `haven-solid-nexus`; component structure and
+Collection-side store writes belong to `haven-shared-core-boundary`; component structure and
 layer law belong to `haven-solid-feature-slice`. This skill owns the reactive
 graph between them.
 

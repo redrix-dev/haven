@@ -27,6 +27,7 @@ export type VoiceMirrorState = {
   participants: VoiceParticipant[];
   selfDisplayName: string;
   selfAvatarUrl: string | null;
+  localSpeaking?: boolean;
   error: string | null;
   notice: string | null;
 };

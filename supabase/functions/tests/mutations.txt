@@ -1,0 +1,60 @@
+# One rule broken per line; the named test must fail. See
+# tooling/scripts/test/run-function-mutations.mjs for the format.
+jobs#worker secret @@ anyone can run a worker @@ _shared/common.ts @@ return sameText(expected, req.headers.get("x-haven-worker-secret") ?? ""); @@ return true;
+jobs#worker secret @@ a worker with no secret configured lets in any caller who sends the header @@ _shared/common.ts @@ if (!expected || expected.length < 16) return false; @@ if (!expected) return req.headers.has("x-haven-worker-secret"); if (expected.length < 16) return false;
+jobs#worker secret @@ a secret too short to be one is accepted @@ _shared/common.ts @@ if (!expected || expected.length < 16) return false; @@ if (!expected) return false;
+jobs#fails is reported @@ a failed job is reported as done @@ _shared/jobs.ts @@ p_error: error, @@ p_error: null,
+jobs#just after a wake @@ a worker leaves as soon as the queue is empty @@ _shared/jobs.ts @@ const lingerMs = options.lingerMs ?? 2_500; @@ const lingerMs = 0;
+jobs#keeps going @@ a worker stops after its first batch @@ _shared/jobs.ts @@ if (claimedThisRound > 0) continue; @@ if (claimedThisRound > 0) break;
+media#deletes its file @@ the delete job leaves the bytes in storage @@ media-worker/handler.ts @@ .remove([file.object_path]); @@ .remove([]);
+media#deletes its file @@ the delete job leaves the row behind @@ media-worker/handler.ts @@ await call(db, "worker_media_deleted", { p_media_id: mediaId }); @@ await Promise.resolve();
+media#held by a safety case @@ the worker deletes without asking the database again @@ media-worker/handler.ts @@ // Held by a case, put back to use, or already gone. @@ await db.storage.from("media").remove([(await db.from("media").select("object_path").eq("id", mediaId).single()).data?.object_path ?? ""]);
+media#held by a safety case @@ a flagged file is moved within the same bucket @@ media-worker/handler.ts @@ destinationBucket: EVIDENCE_BUCKET, @@ destinationBucket: file.bucket,
+media#held by a safety case @@ the database is not told the file moved @@ media-worker/handler.ts @@ await call(db, "worker_media_quarantined", { p_media_id: mediaId }); @@ await Promise.resolve();
+media#before the worker died @@ a finished move is treated as a failure @@ media-worker/handler.ts @@ if (!alreadyMoved) throw new Error(`storage move: ${error.message}`); @@ throw new Error(`storage move: ${error.message}`);
+push#own words @@ Android phones get no notification channel @@ push-worker/handler.ts @@ delivery.platform === "android" @@ delivery.platform === "windows"
+push#own words @@ the Expo access token is not sent @@ push-worker/handler.ts @@ ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}), @@
+push#own words @@ the push says something other than the notification @@ push-worker/handler.ts @@ title: delivery.title, @@ title: "Haven",
+push#removed from @@ a dead push token is kept @@ push-worker/handler.ts @@ ticket.details?.error === "DeviceNotRegistered" @@ ticket.details?.error === "Never"
+push#turned the sound off @@ a muted notification still makes a sound @@ push-worker/handler.ts @@ delivery.data?.sound === false ? {} : { sound: "default" } @@ { sound: "default" }
+push#Expo is down @@ an Expo outage is taken for an answer @@ push-worker/handler.ts @@ if (!response.ok) { @@ if (response.status === 999) {
+push#refuses for every phone @@ a push nobody received is dropped @@ push-worker/handler.ts @@ if (reached === 0) throw new Error(summary); @@
+mail#staff are emailed @@ a retried email can be sent twice @@ mail-worker/handler.ts @@ "idempotency-key": `${job.id}-${index}`, @@
+mail#staff are emailed @@ mail is sent without the API key @@ mail-worker/handler.ts @@ authorization: `Bearer ${apiKey}`, @@
+mail#can reply @@ the statement of reasons goes to staff instead of the person @@ mail-worker/handler.ts @@ to: [email.to_email ?? staff], @@ to: [staff],
+mail#can reply @@ a reply to the statement of reasons goes nowhere @@ mail-worker/handler.ts @@ reply_to: staff, @@
+mail#refuses is tried again @@ a refused email counts as sent @@ mail-worker/handler.ts @@ if (!response.ok) { @@ if (response.status === 999) {
+mail#no mail service @@ mail is attempted with no API key @@ mail-worker/handler.ts @@ const apiKey = requireEnv("RESEND_API_KEY"); @@ const apiKey = env("RESEND_API_KEY") ?? "none";
+link-preview#count as public @@ the cloud metadata address counts as public @@ link-preview-worker/address.ts @@ if (a === 169 && b === 254) return false; // link-local, cloud metadata @@
+link-preview#count as public @@ an IPv4 address hidden in an IPv6 one walks past the rules @@ link-preview-worker/address.ts @@ if (leadingZeros && (groups[5] === 0xffff || groups[5] === 0)) { @@ if (leadingZeros && groups[5] === 0x1234) {
+link-preview#count as public @@ private IPv6 addresses count as public @@ link-preview-worker/address.ts @@ if ((first & 0xfe00) === 0xfc00) return false; // private (fc00::/7) @@
+link-preview#count as public @@ text that is not an address counts as public @@ link-preview-worker/address.ts @@ if (v6) return isPublicIpv6(v6);\n  return false; @@ if (v6) return isPublicIpv6(v6);\n  return true;
+link-preview#refused before any request @@ a name that points inward is fetched @@ link-preview-worker/preview.ts @@ if (!addresses.every(isPublicAddress)) { @@ if (!addresses.some(isPublicAddress)) {
+link-preview#refused before any request @@ an address literal is not checked @@ link-preview-worker/preview.ts @@ if (!isPublicAddress(hostname)) throw new PreviewRefused("private address"); @@
+link-preview#refused before any request @@ any port may be fetched @@ link-preview-worker/preview.ts @@ if (url.port !== "") throw new PreviewRefused("unusual port"); @@
+link-preview#refused before any request @@ an address with a login in it is fetched @@ link-preview-worker/preview.ts @@ if (url.username !== "" || url.password !== "") { @@ if (url.username === "never") {
+link-preview#refused before any request @@ a name with no dot is looked up @@ link-preview-worker/preview.ts @@ !hostname.includes(".") || @@ hostname === "never" ||
+link-preview#cannot redirect @@ redirects are followed without being checked @@ link-preview-worker/preview.ts @@ redirect: "manual", @@ redirect: "follow",
+link-preview#cannot redirect @@ redirects are followed forever @@ link-preview-worker/preview.ts @@ for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) { @@ for (let hop = 0; hop <= 1000; hop += 1) {
+link-preview#read from its tags @@ a page with no description tag gets none @@ link-preview-worker/preview.ts @@ meta["og:description"] ?? meta["twitter:description"] ?? meta.description, @@ meta["twitter:description"] ?? meta.description,
+link-preview#read from its tags @@ HTML entities are shown raw @@ link-preview-worker/preview.ts @@ const text = decodeEntities(value).replace(/\s+/g, " ").trim(); @@ const text = value.replace(/\s+/g, " ").trim();
+link-preview#picture is cached @@ the picture is not kept @@ link-preview-worker/handler.ts @@ ? await cacheImage(net, db, preview.imageUrl) @@ ? await Promise.resolve(null)
+link-preview#never fetched @@ a refused link is retried forever instead of marked failed @@ link-preview-worker/handler.ts @@ if (!temporary && !(error instanceof PreviewRefused)) throw error; @@ if (!temporary) throw error;
+link-preview#tried three times @@ a dead site is retried until the job gives up, leaving the preview pending @@ link-preview-worker/handler.ts @@ const GIVE_UP_AFTER_ATTEMPTS = 3; @@ const GIVE_UP_AFTER_ATTEMPTS = 99;
+link-preview#tried three times @@ a site that is down is given up on at once @@ link-preview-worker/handler.ts @@ if (temporary && job.attempts < GIVE_UP_AFTER_ATTEMPTS) throw error; @@
+voice#in their own name @@ a voice token works for every room @@ voice-token/handler.ts @@ room: roomName(access.channel_id), @@ room: "",
+voice#in their own name @@ a voice token lasts four hours @@ voice-token/handler.ts @@ const TOKEN_LIFETIME = "10m"; @@ const TOKEN_LIFETIME = "4h";
+voice#in their own name @@ the voice token carries a name the app chose @@ voice-token/handler.ts @@ name: access.username, @@ name: body.name ?? "anyone",
+voice#should not have @@ the database's refusal is ignored @@ voice-token/handler.ts @@ if (error) return refusal(error); @@ if (error) console.error(error.message);
+voice#should not have @@ a database refusal is reported as a fault @@ _shared/common.ts @@ "42501": 403, @@
+voice#should not have @@ a token is made with voice half configured @@ _shared/voice.ts @@ return url && apiKey && apiSecret ? { url, apiKey, apiSecret } : null; @@ return { url: url ?? "", apiKey: apiKey ?? "k", apiSecret: apiSecret ?? "secret-secret-secret-secret-secret" };
+voice#checked by the database @@ anyone can remove anyone from voice @@ voice-control/handler.ts @@ if (error) return refusal(error); @@ if (error) console.error(error.message);
+voice#checked by the database @@ a removal is only a polite request @@ voice-control/handler.ts @@ action === "remove" ? await removeFromRoom(channelId, userId) : null; @@ action === "remove" ? true : null;
+voice#checked by the database @@ the wrong person is removed @@ voice-control/handler.ts @@ await client.removeParticipant(roomName(channelId), userId); @@ await client.removeParticipant(roomName(channelId), channelId);
+voice#only a message @@ a mute disconnects the person @@ voice-control/handler.ts @@ action === "remove" ? await removeFromRoom(channelId, userId) : null; @@ await removeFromRoom(channelId, userId);
+voice#only a message @@ any action word is passed to the database @@ voice-control/handler.ts @@ !ACTIONS.includes(action) @@ typeof action !== "string"
+voice#could not enforce @@ a failed removal is reported as done @@ voice-control/handler.ts @@ console.error(`voice-control: remove failed: ${describeError(error)}`);\n    return false; @@ return true;
+voice#could not enforce @@ someone who already left counts as a failure @@ voice-control/handler.ts @@ if (fault.status === 404 || fault.code === "not_found") return true; @@
+manifest @@ the newest release is chosen by id, not by time @@ update-manifest/handler.ts @@ .order("created_at", { ascending: false }) @@ .order("id", { ascending: false })
+manifest @@ a withdrawn release is still offered @@ update-manifest/handler.ts @@ .eq("active", true) @@ .neq("channel", "never")
+manifest @@ a phone is offered the update it already has @@ update-manifest/handler.ts @@ if (currentUpdateId && data.id === currentUpdateId) { @@ if (currentUpdateId === "never") {

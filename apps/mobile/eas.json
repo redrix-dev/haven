@@ -11,10 +11,14 @@
       },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "node": "24.22.1",
+      "corepack": true
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "node": "24.22.1",
+      "corepack": true
     },
     "production": {
       "ios": {
@@ -22,7 +26,9 @@
       },
       "android": {
         "buildType": "apk"
-      }
+      },
+      "node": "24.22.1",
+      "corepack": true
     }
   },
   "submit": {

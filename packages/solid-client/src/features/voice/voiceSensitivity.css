@@ -1,0 +1,28 @@
+.voice-threshold-slider {
+  appearance: none;
+  background: transparent;
+  margin: 0;
+}
+.voice-threshold-slider::-webkit-slider-runnable-track {
+  height: 16px;
+  background: transparent;
+}
+.voice-threshold-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 8px;
+  height: 32px;
+  margin-top: -8px;
+  border: 2px solid var(--card);
+  border-radius: 4px;
+  background: var(--foreground);
+}
+.voice-threshold-slider::-moz-range-track {
+  background: transparent;
+}
+.voice-threshold-slider::-moz-range-thumb {
+  width: 4px;
+  height: 28px;
+  border: 2px solid var(--card);
+  border-radius: 4px;
+  background: var(--foreground);
+}

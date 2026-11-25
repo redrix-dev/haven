@@ -1,5 +1,13 @@
 use tauri::{Emitter, Manager};
 
+// The native voice sidecar host is Linux-only: WebKitGTK ships without WebRTC,
+// so Linux spawns the `haven-voice` sidecar while macOS/Windows run
+// livekit-client in the webview (VoiceProvider gates on platform === "linux").
+// Desktop no longer ships to Linux, so this is quarantined — compiled only when
+// targeting Linux. To resurrect: restore the Linux release/CI lanes; the code
+// below already comes back when the target is linux. See
+// apps/tauri/haven-voice/QUARANTINE.md.
+#[cfg(target_os = "linux")]
 mod voice;
 
 /// Placeholder command demonstrating the JS `invoke("ping")` round-trip.
@@ -11,7 +19,7 @@ fn ping(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // Single-instance MUST be registered first. A second launch (including
         // an OS deep-link invocation on Windows/Linux) hands its args to the
         // already-running instance and exits — no duplicate process. We focus
@@ -29,7 +37,6 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .manage(voice::VoiceState::default())
         .setup(|app| {
             // Register the haven:// scheme at runtime so deep links work in dev
             // (production registers it via the installer). Best-effort.
@@ -39,13 +46,24 @@ pub fn run() {
                 let _ = app.deep_link().register_all();
             }
             Ok(())
-        })
+        });
+
+    // Linux-only: the native voice sidecar state + stdio commands. Quarantined
+    // with `mod voice` above (desktop no longer ships to Linux). macOS/Windows
+    // never invoke these — voice there runs via livekit-client in the webview.
+    #[cfg(target_os = "linux")]
+    let builder = builder
+        .manage(voice::VoiceState::default())
         .invoke_handler(tauri::generate_handler![
             ping,
             voice::voice_join,
             voice::voice_send_command,
             voice::voice_leave
-        ])
+        ]);
+    #[cfg(not(target_os = "linux"))]
+    let builder = builder.invoke_handler(tauri::generate_handler![ping]);
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

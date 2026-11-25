@@ -5,17 +5,6 @@ import {
   type AppHost,
 } from "@shared/infrastructure/platform/appHost";
 
-/**
- * Imperative navigation delegate provided by the active navigator.
- * Wired by `MainNavigator` once the React Navigation container is ready.
- * Defined here so the AppHost can reference it without importing navigation modules.
- */
-export type MobileNavigationDelegate = {
-  navigateToCommunity: (serverId: string, channelId?: string | null) => void;
-  navigateToDm: (conversationId: string) => void;
-};
-
-let activeNavigationDelegate: MobileNavigationDelegate | null = null;
 let runtimeStorage: MMKV | null = null;
 
 function getRuntimeStorage(): MMKV {
@@ -23,12 +12,6 @@ function getRuntimeStorage(): MMKV {
     runtimeStorage = createMMKV({ id: "haven-mobile-runtime-storage" });
   }
   return runtimeStorage;
-}
-
-export function setMobileNavigationDelegate(
-  delegate: MobileNavigationDelegate | null,
-): void {
-  activeNavigationDelegate = delegate;
 }
 
 /**
@@ -59,14 +42,6 @@ export function registerMobileAppHost(): void {
       }
     },
     saveFileFromUrl: async () => ({ saved: false, filePath: null }),
-    navigateToCommunity: (serverId, channelId) => {
-      if (!activeNavigationDelegate) return;
-      activeNavigationDelegate.navigateToCommunity(serverId, channelId ?? null);
-    },
-    navigateToDm: (conversationId) => {
-      if (!activeNavigationDelegate) return;
-      activeNavigationDelegate.navigateToDm(conversationId);
-    },
   };
   setAppHost(host);
 }

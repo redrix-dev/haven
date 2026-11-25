@@ -34,17 +34,8 @@ const SWATCHES: ThemeSwatch[] = listSelectableBuiltinThemes(
   primary: (theme.tokens["primary"] as string) ?? "#3f79d8",
 }));
 
-type ThemeVisualPickerCardProps = {
-  userId: string | null;
-  username: string;
-  avatarUrl: string | null;
-};
-
-export function ThemeVisualPickerCard({
-  userId,
-  username,
-  avatarUrl,
-}: ThemeVisualPickerCardProps) {
+/** The theme is an account setting, so it follows the person to every device. */
+export function ThemeVisualPickerCard() {
   const core = useHavenCore();
   const selectedThemeId = useMobileThemePreferenceStore(
     (s) => s.selectedThemeId,
@@ -57,15 +48,7 @@ export function ThemeVisualPickerCard({
 
   const handleSelect = useCallback(
     async (themeId: string) => {
-      if (!userId || pendingId) return;
-      const trimmedName = username.trim();
-      if (!trimmedName) {
-        Alert.alert(
-          "Username required",
-          "Set a username before changing theme.",
-        );
-        return;
-      }
+      if (pendingId) return;
 
       const previousId = selectedThemeId;
       setPendingId(themeId);
@@ -73,12 +56,7 @@ export function ThemeVisualPickerCard({
       applyMobileTheme(themeId);
 
       try {
-        await core.updateUserProfile({
-          userId,
-          username: trimmedName,
-          avatarUrl,
-          theme: themeId,
-        });
+        await core.account.updateSettings({ theme: themeId });
       } catch (error) {
         setSelectedThemeId(previousId);
         applyMobileTheme(normalizeMobileThemeId(previousId));
@@ -90,22 +68,14 @@ export function ThemeVisualPickerCard({
         setPendingId(null);
       }
     },
-    [
-      core,
-      userId,
-      username,
-      avatarUrl,
-      pendingId,
-      selectedThemeId,
-      setSelectedThemeId,
-    ],
+    [core, pendingId, selectedThemeId, setSelectedThemeId],
   );
 
   const renderItem = useCallback(
     ({ item: swatch }: { item: ThemeSwatch }) => {
       const isSelected = swatch.id === selectedThemeId;
       const isBusy = pendingId === swatch.id;
-      const isDisabled = !userId || Boolean(pendingId);
+      const isDisabled = Boolean(pendingId);
 
       return (
         <Pressable
@@ -170,7 +140,7 @@ export function ThemeVisualPickerCard({
         </Pressable>
       );
     },
-    [handleSelect, pendingId, selectedThemeId, userId],
+    [handleSelect, pendingId, selectedThemeId],
   );
 
   return (

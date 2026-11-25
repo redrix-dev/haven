@@ -120,8 +120,8 @@ payload = {
     "runtime_version": os.environ["RUNTIME_VERSION"],
     "bundle_url": os.environ["BUNDLE_URL"],
     "manifest_url": os.environ["MANIFEST_URL"],
-    "is_active": True,
-    "ota_release_note": os.environ["OTA_RELEASE_NOTE"],
+    "active": True,
+    "note": os.environ["OTA_RELEASE_NOTE"],
     "git_sha": os.environ["GIT_SHA"],
 }
 print(json.dumps(payload))

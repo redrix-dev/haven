@@ -85,8 +85,9 @@ hand-off, and the scheme-ownership traps. The shell's part only:
 - Tauri persistence prefers `tauri-plugin-store` through
   `createTauriPluginStorePersistence()`.
 - Browser dev or plugin failure falls back to shared localStorage persistence.
-- Nexus APIs are sync; the plugin-store adapter keeps an in-memory cache and
-  writes asynchronously.
+- Device storage is read synchronously (the core puts back what the device
+  kept on the first frame); the plugin-store adapter reads the store whole
+  into memory first and writes asynchronously.
 
 ## Validation
 

@@ -1,30 +1,33 @@
-import { createEffect, createMemo } from "solid-js";
+import { createEffect, createMemo, untrack } from "solid-js";
 import { requireHavenSolidCore } from "@solid-client/core";
 
 /**
- * Renders nothing — owns the cross-community modmail load so the inbox + the
- * sidebar badge stay populated app-wide (not just while /modmail is open).
- *
- * The moderatable set is derived reactively from permissions: every community
- * where the viewer holds `canManageReports`. When that set changes — a role
- * granted or revoked, a community joined or left — the effect reloads, so a
- * community's mail appears or disappears as access changes. Live new reports
- * arrive via the `report_created` broadcast (routeRealtimeEvent → nexus).
+ * Renders nothing. Loads the reports of every community the person
+ * moderates (`manage_reports`), so modmail and the sidebar badge are filled
+ * app-wide. New and changed reports then arrive as events; a moderator who
+ * loses `manage_reports` loses that community's reports in the core.
  *
  * Mounted once in the authed layout.
  */
 export function ModmailLoader() {
   const core = requireHavenSolidCore();
+  const moderated = createMemo(() =>
+    Object.keys(core.stores.communities.byId)
+      .filter((id) => core.communities.can(id, "manage_reports"))
+      .sort()
+      .join(","),
+  );
 
-  const moderatableIds = createMemo(() => {
-    const byCommunity = core.permissions.getPermissionsByCommunityId();
-    return Object.keys(byCommunity)
-      .filter((id) => byCommunity[id]?.canManageReports)
-      .sort();
-  });
-
+  // Track the moderated set only; loading reads the reports store.
   createEffect(() => {
-    void core.moderation.load(moderatableIds());
+    const ids = moderated() ? moderated().split(",") : [];
+    untrack(() => {
+      for (const id of ids) {
+        if (!(id in core.stores.reports.byCommunity)) {
+          void core.reports.loadCommunity(id);
+        }
+      }
+    });
   });
 
   return null;

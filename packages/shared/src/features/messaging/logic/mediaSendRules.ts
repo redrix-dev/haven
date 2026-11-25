@@ -1,14 +1,5 @@
 import type { SendCommunityMessageMediaOptions } from "./types";
 
-export function coerceMediaExpiresInHours(
-  value: number | undefined,
-): 1 | 24 | 168 | 720 {
-  if (value === 1 || value === 24 || value === 168 || value === 720) {
-    return value;
-  }
-  return 720;
-}
-
 export function validateMediaSendOptions(
   options: SendCommunityMessageMediaOptions | undefined,
 ): { hasBlob: boolean; hasBuffer: boolean } {

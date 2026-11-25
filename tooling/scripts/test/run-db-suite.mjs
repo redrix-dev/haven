@@ -38,7 +38,8 @@ function isResetSchemaReady() {
       "-t",
       "-A",
       "-c",
-      "select case when to_regclass('public.communities') is not null and to_regclass('public.notification_dispatch_wakeups') is not null then 1 else 0 end",
+      // The first and the last thing the migrations create.
+      "select case when to_regclass('private.jobs') is not null and to_regclass('public.ota_releases') is not null then 1 else 0 end",
     ],
     {
       cwd: repoRoot,

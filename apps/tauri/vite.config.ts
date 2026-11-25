@@ -32,6 +32,10 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true,
+    // The Vite root contains src-tauri. Without this, Vite watches Cargo's
+    // target/ and dies with EBUSY when Cargo is mid-write on a build-script
+    // exe (seen on Windows during a cold `tauri dev` build).
+    watch: { ignored: ["**/src-tauri/**"] },
   },
   // Tauri controls the terminal; don't let Vite wipe its output.
   clearScreen: false,

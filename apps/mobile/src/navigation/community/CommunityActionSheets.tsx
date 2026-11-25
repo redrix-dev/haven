@@ -6,7 +6,6 @@ import { useMobileThemeTokens } from "@/hooks/useMobileThemeTokens";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import { normalizeInviteCode } from "@shared/features/community/utils/inviteCode";
-import { describeInviteRedeemError } from "@shared/features/community/utils/inviteRedeemError";
 import { resolveColorProp } from "@shared/themes";
 import { useHavenCore } from "@mobile-data";
 import { setLastCommunitySurface } from "@/storage/communitySurfacePrefs";
@@ -17,7 +16,6 @@ type CommunityActionSheetsProps = {
   joinOpen: boolean;
   /** From an invite link: fills the join sheet's invite field. */
   joinPrefill?: { code: string; seq: number } | null;
-  userId: string | null;
   onCloseActions: () => void;
   onChooseCreate: () => void;
   onChooseJoin: () => void;
@@ -31,7 +29,6 @@ export function CommunityActionSheets({
   createOpen,
   joinOpen,
   joinPrefill,
-  userId,
   onCloseActions,
   onChooseCreate,
   onChooseJoin,
@@ -98,13 +95,12 @@ export function CommunityActionSheets({
 
   const handleCreateCommunity = useCallback(async () => {
     const name = createName.trim();
-    if (!name || !userId) return;
+    if (!name) return;
 
     setCreateLoading(true);
     setCreateError(null);
     try {
-      const { id } = await core.createCommunity(userId, name);
-      await core.prepareCommunityEntry(id);
+      const id = await core.createCommunity(name);
       await setLastCommunitySurface("drawer");
       setCreateName("");
       closeCreate();
@@ -114,7 +110,7 @@ export function CommunityActionSheets({
     } finally {
       setCreateLoading(false);
     }
-  }, [closeCreate, core, createName, onCommunityReady, userId]);
+  }, [closeCreate, core, createName, onCommunityReady]);
 
   const handleJoinCommunity = useCallback(async () => {
     const code = normalizeInviteCode(joinInvite);
@@ -126,15 +122,14 @@ export function CommunityActionSheets({
     setJoinLoading(true);
     setJoinError(null);
     try {
-      const redeemed = await core.joinCommunityByInvite(code);
-      const communityId = redeemed.communityId;
-      await core.prepareCommunityEntry(communityId);
+      // Someone already in the community lands on it like anyone else.
+      const communityId = await core.joinCommunity(code);
       await setLastCommunitySurface("drawer");
       setJoinInvite("");
       closeJoin();
       onCommunityReady(communityId);
     } catch (error) {
-      setJoinError(describeInviteRedeemError(error));
+      setJoinError(getErrorMessage(error, "Couldn't join that community."));
     } finally {
       setJoinLoading(false);
     }
@@ -199,11 +194,9 @@ export function CommunityActionSheets({
             </Pressable>
             <Pressable
               onPress={() => void handleCreateCommunity()}
-              disabled={createLoading || !createName.trim() || !userId}
+              disabled={createLoading || !createName.trim()}
               className={`rounded-xl bg-primary px-5 py-2.5 ${
-                createLoading || !createName.trim() || !userId
-                  ? "opacity-45"
-                  : ""
+                createLoading || !createName.trim() ? "opacity-45" : ""
               }`}
             >
               <Text className="text-center font-semibold text-primary-foreground">

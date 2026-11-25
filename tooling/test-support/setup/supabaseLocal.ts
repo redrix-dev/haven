@@ -1,17 +1,30 @@
+// For the backend contract tests (packages/shared/src/lib/backend/__tests__):
+// the real backend clients, signed in as the fixture people, against the
+// local Supabase stack. Run them with `npm run test:backend`, which sets the
+// environment and reloads the fixtures before each file.
+
 import { createClient } from "@supabase/supabase-js";
 import { execFileSync } from "node:child_process";
 import { createHavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
-import { createMemoryPersistence } from "@shared/core";
-import { createHavenCore } from "@mobile-data/core";
-import { createReactHavenCoreOptions } from "@mobile-data/createReactHavenCore";
+import { createBackend, type Backend } from "@shared/lib/backend";
+import type { HavenSupabaseClient } from "@shared/lib/createHavenSupabaseClient";
 import type { Database } from "@shared/types/database";
 import { loadBootstrappedTestUsers, type TestUserKey } from "../fixtures/users";
+import { totp } from "./totp";
 
 const requireEnv = (
-  key: "SUPABASE_URL" | "SUPABASE_ANON_KEY" | "SUPABASE_SERVICE_ROLE_KEY",
+  key:
+    | "SUPABASE_URL"
+    | "SUPABASE_ANON_KEY"
+    | "SUPABASE_SERVICE_ROLE_KEY"
+    | "POSTGRES_URL",
 ) => {
   const value = process.env[key];
-  if (!value) throw new Error(`Missing ${key} for local Supabase tests.`);
+  if (!value) {
+    throw new Error(
+      `Missing ${key}. Run these tests with: npm run test:backend`,
+    );
+  }
   return value;
 };
 
@@ -19,117 +32,148 @@ export const localSupabaseEnv = {
   url: requireEnv("SUPABASE_URL"),
   anonKey: requireEnv("SUPABASE_ANON_KEY"),
   serviceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  postgresUrl: requireEnv("POSTGRES_URL"),
 };
 
+/** The operator's view, for looking at what is true. Skips RLS. */
 export const serviceSupabase = createClient<Database>(
   localSupabaseEnv.url,
   localSupabaseEnv.serviceRoleKey,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  },
+  { auth: { persistSession: false, autoRefreshToken: false } },
 );
 
-export const supabase = createHavenSupabaseClient(
-  localSupabaseEnv.url,
-  localSupabaseEnv.anonKey,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  },
-);
+export type Actor = {
+  id: string;
+  username: string;
+  client: HavenSupabaseClient;
+  backend: Backend;
+};
 
-createHavenCore(
-  createReactHavenCoreOptions({
-    client: supabase,
-    publicConfig: {
-      supabaseUrl: localSupabaseEnv.url,
-      supabaseAnonKey: localSupabaseEnv.anonKey,
-    },
-    persistence: createMemoryPersistence(),
-  }),
-);
+const signedIn = new Map<TestUserKey, Actor>();
+let staffWithFactor: Actor | null = null;
 
-export async function signInAsTestUser(userKey: TestUserKey) {
-  const users = loadBootstrappedTestUsers();
-  const user = users[userKey];
-  const { error } = await supabase.auth.signInWithPassword({
+/**
+ * One fixture person, signed in through the real Auth API with their own
+ * client, so a test can act as two people at once.
+ */
+export async function actor(key: TestUserKey): Promise<Actor> {
+  const known = signedIn.get(key);
+  if (known) return known;
+  const made = await signIn(key);
+  signedIn.set(key, made);
+  return made;
+}
+
+/**
+ * The active staff account, signed in with a second factor as staff work
+ * requires: it enrolls an authenticator and answers it, so the session is
+ * aal2. `actor("platform_staff_active")` is the same account with a password
+ * only, which the database refuses for staff work. The factor is deleted
+ * again by `signOutAll`.
+ */
+export async function staffActor(): Promise<Actor> {
+  if (staffWithFactor) return staffWithFactor;
+  const made = await signIn("platform_staff_active");
+  forgetFactors(made.id);
+  const enrolled = await made.client.auth.mfa.enroll({ factorType: "totp" });
+  if (enrolled.error) throw enrolled.error;
+  const verified = await made.client.auth.mfa.challengeAndVerify({
+    factorId: enrolled.data.id,
+    code: await totp(enrolled.data.totp.secret),
+  });
+  if (verified.error) throw verified.error;
+  staffWithFactor = made;
+  return made;
+}
+
+function forgetFactors(userId: string): void {
+  sql(`delete from auth.mfa_factors where user_id = '${userId}'`);
+}
+
+async function signIn(key: TestUserKey): Promise<Actor> {
+  const user = loadBootstrappedTestUsers()[key];
+  const client = createHavenSupabaseClient(
+    localSupabaseEnv.url,
+    localSupabaseEnv.anonKey,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+  const { error } = await client.auth.signInWithPassword({
     email: user.email,
     password: user.password,
   });
   if (error) throw error;
-  return user;
+  return {
+    id: user.id,
+    username: user.username,
+    client,
+    backend: createBackend(client),
+  };
 }
 
-export async function signOutTestUser() {
-  await supabase.auth.signOut();
-}
-
-export async function getCurrentAuthUserId(): Promise<string | null> {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) throw error;
-  return data.user?.id ?? null;
-}
-
-export async function getFixtureCommunityByName(name = "TEST:RLS Community") {
-  const { data, error } = await serviceSupabase
-    .from("communities")
-    .select("id, name")
-    .eq("name", name)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data?.id) {
-    throw new Error(
-      `Fixture community "${name}" not found. Run "npm run test:db" (or at least db reset + fixtures) first.`,
-    );
+/** Signs everyone out; call in afterAll. */
+export async function signOutAll(): Promise<void> {
+  const everyone = [...signedIn.values()];
+  if (staffWithFactor) everyone.push(staffWithFactor);
+  for (const known of everyone) {
+    known.client.realtime.disconnect();
+    await known.client.auth.signOut();
   }
-  return data;
+  if (staffWithFactor) forgetFactors(staffWithFactor.id);
+  staffWithFactor = null;
+  signedIn.clear();
 }
 
-export async function getFixtureChannelByName(input: {
-  communityId: string;
-  name: string;
-}) {
-  const { data, error } = await serviceSupabase
-    .from("channels")
-    .select("id, community_id, name")
-    .eq("community_id", input.communityId)
-    .eq("name", input.name)
-    .order("position", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data?.id) {
-    throw new Error(
-      `Fixture channel "${input.name}" not found in community ${input.communityId}.`,
-    );
-  }
-  return data;
-}
-
-export async function resetFixtureDomainState() {
-  const postgresUrl = process.env.POSTGRES_URL;
-  if (!postgresUrl) {
-    throw new Error("Missing POSTGRES_URL for backend contract tests.");
-  }
-  execFileSync(
+/** Runs SQL as the operator and returns the first column of each row. */
+export function sql(statement: string): string[] {
+  const output = execFileSync(
     "psql",
     [
-      postgresUrl,
+      localSupabaseEnv.postgresUrl,
+      "-X",
+      "-q",
+      "-t",
+      "-A",
       "-v",
       "ON_ERROR_STOP=1",
       "-c",
-      "select test_support.cleanup_fixture_domain_state();",
+      statement,
     ],
-    {
-      stdio: ["ignore", "ignore", "pipe"],
-    },
+    { encoding: "utf8" },
   );
+  return output.split(/\r?\n/).filter((line) => line.length > 0);
+}
+
+/** The fixture community, TEST: Hearth (supabase/tests/fixtures/00_hearth.sql). */
+export function hearthId(): string {
+  const [id] = sql("select test_support.hearth_id()");
+  if (!id) throw new Error("TEST: Hearth is missing. Run npm run test:db.");
+  return id;
+}
+
+export function hearthChannelId(name: string): string {
+  const [id] = sql(
+    `select test_support.channel_id('${name.replace(/'/g, "''")}')`,
+  );
+  if (!id) throw new Error(`No fixture channel ${name}.`);
+  return id;
+}
+
+/** Waits until `check` returns something, or fails after `ms`. */
+export async function eventually<T>(
+  check: () => T | undefined | null | false,
+  ms = 5000,
+): Promise<T> {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    const value = check();
+    if (value) return value;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`nothing arrived within ${ms}ms`);
 }

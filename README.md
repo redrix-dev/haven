@@ -8,142 +8,96 @@
 [![CI](https://github.com/redrix-dev/haven/actions/workflows/ci.yml/badge.svg)](https://github.com/redrix-dev/haven/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](./LICENSE.md)
 
-Haven is a real-time community chat platform across desktop, web, and iOS. It exists because community chat stopped feeling like it was built for communities — and proving that it could be done differently was worth the effort.
+Haven is a place for a community to talk: text, voice, and the people you
+actually know. No feeds, no ads, no algorithm deciding what you see. It runs on
+iPhone, on Windows and macOS, and in the browser.
+
+It started because the chat apps my friends and I used stopped feeling like
+they were made for us. Building one that did seemed worth the effort.
 
 ![Haven chat interface](docs/assets/screenshot-chat.png)
 
----
+## What you can do
 
-## Highlights
-
-- **Access control enforced in Postgres, not the UI.** Every permission check is an RLS policy or a security-definer RPC — the client reflects what the database says, it does not decide. A user with devtools cannot bypass it. [How it works ↓](#security-lives-in-the-database-not-the-ui) · [Verify it yourself ↓](#verifying-the-security-model)
-- **One framework-free core, three clients.** Domain logic, types, and state live in `packages/shared` with zero React or Solid imports, bound to React Native on iOS and Solid on desktop/web. CI enforces the boundary mechanically. [How it works ↓](#the-monorepo-is-structured-around-a-stable-shared-core)
-- **A custom OTA pipeline for iOS.** A from-scratch Expo Updates-compatible toolchain — asset hashing, bundle generation, manifest serving via a Supabase Edge Function — that replaces EAS Update and keeps update infrastructure under the same roof as the backend. [How it works ↓](#architecture)
-- **Real-time everything.** Markdown text channels, WebRTC voice over LiveKit, direct messages, friends, media upload, moderation, and push notifications — over a single per-user realtime subscription.
-
----
-
-## What it is
-
-Haven gives streamers and their communities a space that works the way they'd expect — without the algorithmic feeds, ad targeting, or identity verification schemes that have crept into the platforms people used to love.
-
-- Invite-only community spaces with server-scoped roles and permissions
-- Real-time text channels with full markdown composition and rendering
-- Voice channels via WebRTC
-- Direct messages, friends, notifications, and push notifications
-- Media upload and community management tools
-- A moderation system enforced at the database level, not the client
-- A permission model that's readable, versioned, and verifiable
+- **Communities.** Invite-only spaces with channels, categories, roles and
+  permissions you can read and understand.
+- **Text channels.** Markdown, replies, reactions, images and link previews.
+- **Voice channels.** Drop in and talk, on desktop, web and iPhone.
+- **Conversations.** Direct messages, one to one.
+- **Friends.** Add someone by username, or share a friend link.
+- **Notifications.** In the app and as push notifications on iPhone. Mute a
+  channel or a conversation when it gets noisy.
+- **Privacy.** You choose who can message you, who can send you a friend
+  request, and who sees your bio.
+- **Moderation.** Reports, modmail, kicks and bans, for the people running a
+  community and for Haven itself.
+- **Themes.** Several, saved to your account so they follow you.
 
 ## Platforms
 
-**iOS** is distributed through TestFlight. **Desktop (Windows and macOS) and web** are rebuilt on Tauri + Solid, currently at `2.1.0` — the previous Electron/React clients shipped to production, proved the product, and were retired in favor of a lighter shell and a faster renderer. All three clients run against the same shared core and backend.
+- **iPhone:** through TestFlight.
+- **Desktop:** Windows and macOS, built with Tauri. The last release is
+  `3.0.0`.
+- **Web:** the same app as desktop, served from Vercel.
 
-A Linux desktop build exists in the repo but is not shipped as of 2.1.0: packaging it carries upkeep of its own (a native voice sidecar, because WebKitGTK has no WebRTC, and GStreamer bundling) that no current user needs. [NATIVE_VOICE.md](docs/architecture/NATIVE_VOICE.md) documents what it takes to bring it back.
+All three talk to the same database and share the same core logic, so they
+behave the same way.
 
-The iOS client runs on a custom OTA update pipeline built on top of Expo Updates — asset hashing, bundle generation, and manifest serving are handled by a local toolchain that publishes to a Supabase-backed Edge Function. This replaces EAS Update entirely and keeps the update infrastructure under the same roof as the rest of the backend. Everything outside of voice works on mobile: DMs, reports, modmail, push notifications, community creation, invites, friends, media upload, and full rich text composition and rendering via [`react-native-enriched-markdown`](https://github.com/software-mansion-labs/react-native-enriched-markdown).
-
----
-
-## Why it's built this way
-
-### Security lives in the database, not the UI
-
-Most chat platforms treat access control as a presentation problem — hide things from users who shouldn't see them. Haven treats it as a data problem. Every permission check is a Postgres RLS policy or a security-definer RPC. The client reflects what the database says. It does not decide.
-
-This matters because a client can lie. A user can bypass UI guards with devtools. A Postgres row-level security policy enforced at the query level cannot be bypassed from the client regardless of what the frontend does. Moderation visibility, ban enforcement, channel access — all of it bottoms out at the database.
-
-### The anon key being public is intentional
-
-Haven uses Supabase's publishable anon key on the client. This is the correct approach, not a shortcut. The anon key cannot do anything the RLS policies do not permit. The service role key never ships in the renderer. Voice relay credentials live in Edge Function secrets and are only returned after the function validates the requesting user's JWT and confirms channel membership before responding.
-
-### The source is public for the same reason
-
-The schema, RLS policies, migration history, and voice relay function are all readable in this repo. If the security model works, it should hold up to inspection. If it doesn't, hiding it wouldn't make it safer.
-
-### The monorepo is structured around a stable shared core
-
-Business logic, types, and domain state live in `packages/shared` and are platform-agnostic — framework-free TypeScript with no React or Solid imports allowed (CI enforces this). Platform-specific behavior is isolated to each app target through a registration pattern rather than leaking into shared code. The iOS client and the Tauri/Solid desktop/web client run against the same tested core.
-
----
-
-## Stack
-
-| Layer             | Technology                                                                  |
-| ----------------- | --------------------------------------------------------------------------- |
-| Desktop & Web     | Tauri + Solid (`2.1.0`; previous Electron/React clients retired)            |
-| iOS               | React Native + Expo (dev client, TestFlight)                                |
-| Language          | TypeScript                                                                  |
-| UI                | Solid (desktop/web), UniWind + RN primitives (iOS)                          |
-| Backend           | Supabase (Auth, Postgres, Realtime, Edge Functions)                         |
-| OTA Updates (iOS) | Custom Expo Updates-compatible pipeline via Supabase Edge Function          |
-| Voice             | LiveKit Cloud + WebRTC                                                      |
-| State             | Framework-free core (`zustand/vanilla`) with per-platform reactive bindings |
-| Monorepo          | `packages/shared` across all platforms                                      |
-
----
-
-## Architecture
-
-At a glance — one law, dependencies point inward:
-
-```
-packages/shared (pure logic)  →  per-platform cache  →  per-platform UI
-   framework-free TypeScript      React (iOS) /            React Native (iOS) /
-   shared by every platform       Solid (desktop, web)     Solid (desktop, web)
-```
-
-Haven is a monorepo with two app targets and two core packages:
-
-- `apps/mobile` — React Native + Expo, actively distributed via TestFlight
-- `apps/tauri` — Tauri desktop shell hosting the Solid client
-- `apps/web` — the same Solid client built as a static SPA (Vercel)
-- `packages/shared` — framework-free types, domain state, and business logic shared across all platforms
-- `packages/solid-client` — Solid UI layer for desktop and web
-
-Domain state lives in framework-free stores (`zustand/vanilla`) inside `packages/shared`; each platform binds those stores to its own reactivity system (React hooks on mobile, Solid signals on desktop). Components subscribe only to the slice of state they need, which produces real and measurable render isolation rather than theoretical benefits.
-
-The iOS OTA pipeline is a custom implementation of the Expo Updates protocol. A local toolchain handles asset fingerprinting, bundle generation, and manifest construction. The manifest is served by a Supabase Edge Function and the client fetches and applies updates at launch without going through EAS. This gives full control over the update cadence and keeps update infrastructure consolidated with the rest of the backend.
-
-Full documentation — engineering principles, architecture, and the release cadence — starts at [docs/README.md](docs/README.md).
-
----
-
-## Verifying the security model
-
-1. Client auth and data access — `packages/shared/src/lib/createHavenSupabaseClient.ts`
-2. RLS policies and schema — `supabase/migrations/`
-3. Voice secret handling — `supabase/functions/voice-token/index.ts`
-
-Run the app against your own Supabase project and inspect network calls in devtools. Nothing load-bearing is hidden.
-
----
-
-## Testing
-
-Haven includes a local Supabase-backed regression harness covering SQL, RLS policies, and backend seam contracts.
-
-```bash
-npm run test:db        # SQL + RLS regression suite via psql against local Supabase
-npm run test:backend   # Backend seam contract and integration tests
-npm run test:unit      # Shared-core and mobile unit tests
-npm run test:report    # Human-readable proof report with full logs
-```
-
----
+A Linux desktop build lives in the repo but isn't shipped. Voice on Linux
+needs a native helper of its own, and nobody using Haven needs it yet.
+[NATIVE_VOICE.md](docs/architecture/NATIVE_VOICE.md) covers what bringing it
+back would take.
 
 ## Status
 
-**Haven works and is parked.** `2.1.0` is a deliberate stopping point: the iOS client is on TestFlight, the desktop and web clients are rebuilt on Tauri + Solid against the same shared core, and the previous Electron and React web clients were retired in June 2026.
+Haven is one person's project, worked on in bursts. Right now nobody uses it
+day to day; the group of friends it was built for has moved on. That made it a
+good time to start the foundation over.
 
-There is no active user base. Haven was built for a small group of friends who have since moved on, and it is maintained by one person in the open, in bursts, rather than continuously. That shapes what you should expect: the code, tests, and docs are kept honest and current, but issues and pull requests may sit for a while, and features arrive when there is a reason to build them.
+In November 2026 the database was rebuilt from scratch around what the product
+needs, and all three apps were moved onto it. Next is testing that work on
+real devices and shipping new builds.
 
-If you want to run it, the [documentation](docs/README.md) is written to be enough to stand it up against your own Supabase project.
+Bugs and ideas go in [GitHub Issues](https://github.com/redrix-dev/haven/issues).
+They may sit a while, but they are read.
 
----
+## Stack
+
+| Part          | What it uses                                                     |
+| ------------- | ---------------------------------------------------------------- |
+| Desktop & web | Tauri v2 and Solid                                               |
+| iPhone        | React Native and Expo, with its own over-the-air update pipeline |
+| Shared core   | TypeScript with no UI framework, used by every app               |
+| Backend       | Supabase: Postgres, Auth, Realtime, Edge Functions               |
+| Voice         | LiveKit                                                          |
+
+## How it's built
+
+Two ideas shape most of the code:
+
+- **The database decides who can do what.** Every permission is checked in
+  Postgres. The apps show what the database allows; they can't grant anything
+  it doesn't.
+- **The logic is written once.** What happens when a message arrives, how a
+  channel loads, what a permission means: that lives in `packages/shared` and
+  every app uses it. Each app only draws the screens.
+
+The details, including why the public Supabase key and the public source are
+safe, are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The documentation
+starts at [docs/README.md](docs/README.md) and is meant to be enough to run
+Haven against your own Supabase project.
+
+## Running the tests
+
+```bash
+npm run test:cleave    # lint, typecheck, unit tests: the floor for every merge
+npm run test:db        # the database's own tests, against local Supabase
+npm run test:backend   # the apps' calls against local Supabase
+```
 
 ## License
 
-Haven is open source under the [MIT License](./LICENSE.md) — use it, fork it, build on it. It was previously source-available under BSL 1.1, whose change license was already MIT; that switch was simply made early.
+Haven is open source under the [MIT License](./LICENSE.md). Use it, fork it,
+build on it.
 
 Inquiries: legal@redrixx.com

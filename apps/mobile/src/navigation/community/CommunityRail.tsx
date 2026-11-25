@@ -1,10 +1,10 @@
-import type { ServerSummary } from "@shared/lib/backend/types";
+import type { Community } from "@shared/lib/backend/records";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedIonicons, type ThemedIoniconsProps } from "@/theme-rn";
 
 type CommunityRailProps = {
-  communities: ServerSummary[];
+  communities: Community[];
   activeCommunityId: string | null;
   onSelectCommunity: (communityId: string) => void;
   onOpenProfile: () => void;

@@ -43,8 +43,9 @@ libwebrtc and LiveKit Rust cannot leak into the app host or non-Linux bundles.
 ## Platform Ownership
 
 - `src-tauri` is cross-platform Tauri host code.
-- `haven-voice` is Linux-shipped today, even though some dependencies have
-  platform entries in the lockfile.
+- `haven-voice` is Linux-only and kept buildable, but not shipped in releases
+  since 2.1.0 (see `docs/architecture/NATIVE_VOICE.md`), even though some
+  dependencies have platform entries in the lockfile.
 - Linux sidecar build needs ALSA, GTK/glib/WebKit stack libraries, pkg-config, a
   C++ toolchain, network access to the LiveKit git rev, and the prebuilt
   libwebrtc download host.

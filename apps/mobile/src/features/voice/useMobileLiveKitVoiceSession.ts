@@ -2,32 +2,47 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
 import * as Haptics from "expo-haptics";
 import { AndroidAudioTypePresets, AudioSession } from "@livekit/react-native";
+import { AudioDeviceModule } from "@livekit/react-native-webrtc";
 import {
   ConnectionState,
   Room,
   RoomEvent,
   Track,
+  type LocalAudioTrack,
   type RemoteParticipant,
 } from "livekit-client";
 import { useHavenCore } from "@mobile-data";
-import { useVoiceSession } from "@mobile-data/hooks";
+import { useVoiceSession } from "@mobile-data";
 import { useVoiceMemberVolumes } from "@/features/voice/hooks/useVoiceMemberVolumes";
 import type {
   VoiceControllerChannel,
   VoiceParticipant,
+  VoiceKickPayload,
 } from "@shared/features/voice/types";
 import type { VoiceSettings } from "@shared/types/settings";
+import { VoiceInputGate } from "@shared/features/voice/utils/inputGate";
+import type { VoiceCaptureLevelSource } from "@shared/features/voice/utils/inputGate";
+import { monitorSpeaking } from "@shared/features/voice/utils/speakingMonitor";
+import { perfTrace } from "@shared/debug/perfTrace";
 import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import type { VoiceSoundEvent } from "@shared/features/voice/utils/voiceSounds";
+import { playMobileVoiceSound } from "./mobileVoiceSounds";
+import {
+  monitorNativeCaptureLevel,
+  type NativeCaptureTrack,
+} from "./mobileVoiceCaptureMonitor";
+import { CaptureRecordingController } from "./mobileVoiceCaptureRecording";
+import {
+  createVoiceControlSessionId,
+  readVoiceControlSessionId,
+  readVoiceDeafened,
+  readVoiceHardMuted,
+  mergeVoiceMetadata,
+} from "@shared/features/voice/utils/memberControls";
 import {
   startVoiceForegroundService,
   stopVoiceForegroundService,
 } from "@/features/voice/mobileVoiceForegroundService";
-
-type VoiceKickPayload = {
-  targetUserId: string;
-  channelId: string;
-  kickedBy: string;
-};
 
 export type MobileVoiceOutputOption = {
   id: string;
@@ -45,6 +60,7 @@ export type MobileVoiceControllerState = {
   notice: string | null;
   localInputLevel: number;
   voiceActivityGateOpen: boolean;
+  localSpeaking: boolean;
   remoteVolumes: Record<string, number>;
   outputDevices: MobileVoiceOutputOption[];
   selectedOutputDeviceId: string;
@@ -78,8 +94,11 @@ type UseMobileLiveKitVoiceSessionInput = {
   onInterrupted?: () => void;
 };
 
-const VOICE_ACTIVITY_GATE_RELEASE_MS = 220;
 const INPUT_LEVEL_INTERVAL_MS = 80;
+// iOS sender stats stop reporting capture levels once the activity gate
+// deactivates the sender's encoding, so the meter and the reopen decision read
+// the native capture monitor instead (its samples arrive about every 40 ms).
+const NATIVE_CAPTURE_LEVEL_MAX_AGE_MS = 300;
 const VOICE_CONTROL_CHANNEL_FAILURE_MESSAGE =
   "We're having trouble connecting you to voice services. Please try again, and contact support if this keeps happening.";
 
@@ -94,25 +113,21 @@ function playVoiceControlFeedback(enabled: boolean): void {
 }
 
 type VoiceJoinTimer = {
-  mark: (label: string, details?: Record<string, unknown>) => void;
+  mark: (label: string) => void;
+  finish: (failed?: boolean) => void;
 };
 
-function createVoiceJoinTimer(channelName: string): VoiceJoinTimer {
-  const enabled = typeof __DEV__ !== "undefined" && __DEV__;
-  const startedAt = Date.now();
-  let previousAt = startedAt;
-
+function createVoiceJoinTimer(channelId: string): VoiceJoinTimer {
+  const span = perfTrace.begin("voice.join", { channelId });
+  let closed = false;
   return {
-    mark: (label, details = {}) => {
-      if (!enabled) return;
-      const now = Date.now();
-      console.info("[voice:join]", label, {
-        channelName,
-        elapsedMs: now - startedAt,
-        deltaMs: now - previousAt,
-        ...details,
-      });
-      previousAt = now;
+    mark: (label) => {
+      perfTrace.mark(`voice.join.${label}`, { channelId });
+    },
+    finish: (failed = false) => {
+      if (closed) return;
+      closed = true;
+      span.end(failed ? { error: 1, channelId } : { channelId });
     },
   };
 }
@@ -160,10 +175,12 @@ function formatOutputLabel(id: string): string {
 
 async function ensureAndroidVoicePermissions(): Promise<void> {
   if (Platform.OS !== "android") return;
-  const permissions = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
-  if (Number(Platform.Version) >= 33) {
-    permissions.push(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
-  }
+  const permissions = [
+    PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+    ...(Number(Platform.Version) >= 33
+      ? [PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS]
+      : []),
+  ];
   const results = await PermissionsAndroid.requestMultiple(permissions);
   const microphoneResult = results[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO];
   if (microphoneResult !== PermissionsAndroid.RESULTS.GRANTED) {
@@ -186,7 +203,7 @@ export function useMobileLiveKitVoiceSession({
   livekitRoom: Room;
 } {
   const core = useHavenCore();
-  const voiceSession = useVoiceSession(core.voice);
+  const voiceSession = useVoiceSession();
   const joined = voiceSession.joined;
   const isMuted = voiceSession.isMuted;
   const isDeafened = voiceSession.isDeafened;
@@ -196,6 +213,76 @@ export function useMobileLiveKitVoiceSession({
   const [notice, setNotice] = useState<string | null>(null);
   const [localInputLevel, setLocalInputLevel] = useState(0);
   const [voiceActivityGateOpen, setVoiceActivityGateOpen] = useState(false);
+  const [localSpeaking, setLocalSpeaking] = useState(false);
+  const [localMicTrack, setLocalMicTrack] = useState<LocalAudioTrack | null>(
+    null,
+  );
+  // Starting or stopping capture reconfigures the shared iOS audio session,
+  // and a cue playing across that change stutters. So in a call, a mute or
+  // deafen cue waits here until the capture change below has finished.
+  const pendingCueRef = useRef<VoiceSoundEvent | null>(null);
+  const playCue = useCallback(
+    (event: VoiceSoundEvent) => {
+      if (!core.voice.getSnapshot().joined) {
+        void playMobileVoiceSound(
+          event,
+          core.voice.getSnapshot().soundSettings,
+        );
+        return;
+      }
+      pendingCueRef.current = event;
+    },
+    [core.voice],
+  );
+  // Native capture measurement for the gate. Readings arrive from the native
+  // volume processor about every 40 ms — including silence — so freshness is
+  // keyed to the arrival, not to React state changes. `useTrackVolume` exposes
+  // a value, not sample arrivals; repeated equal readings need fresh timestamps.
+  const nativeCaptureSampleRef = useRef<{
+    level: number;
+    updatedAt: number;
+  } | null>(null);
+  // Serialize the SDK's explicit recording requests across mute/leave/rejoin.
+  // Holding recording independently of RTP keeps native meter callbacks alive.
+  const nativeRecording = useMemo(
+    () =>
+      new CaptureRecordingController(
+        {
+          start: () => AudioDeviceModule.startLocalRecording(),
+          setPrepared: (enabled) =>
+            AudioDeviceModule.setRecordingAlwaysPreparedMode(enabled),
+          stop: () => AudioDeviceModule.stopLocalRecording(),
+          isRecording: () => AudioDeviceModule.isRecording(),
+        },
+        (enabled) =>
+          perfTrace.mark(
+            enabled ? "voice.capture.start" : "voice.capture.stop",
+          ),
+      ),
+    [],
+  );
+  const setNativeRecording = useCallback(
+    (enabled: boolean): Promise<void> =>
+      Platform.OS === "ios"
+        ? nativeRecording.setEnabled(enabled)
+        : Promise.resolve(),
+    [nativeRecording],
+  );
+  useEffect(() => {
+    nativeCaptureSampleRef.current = null;
+    if (Platform.OS !== "ios" || !localMicTrack) return;
+    const stop = monitorNativeCaptureLevel(
+      localMicTrack.mediaStreamTrack as NativeCaptureTrack,
+      (level) => {
+        nativeCaptureSampleRef.current = { level, updatedAt: Date.now() };
+      },
+    );
+    return () => {
+      stop?.();
+      nativeCaptureSampleRef.current = null;
+    };
+  }, [localMicTrack]);
+  const speakingRef = useRef<ReadonlyMap<string, boolean>>(new Map());
   const [outputDevices, setOutputDevices] = useState<MobileVoiceOutputOption[]>(
     [{ id: "default", label: "Auto" }],
   );
@@ -224,9 +311,9 @@ export function useMobileLiveKitVoiceSession({
   const inputLevelIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
-  const lastVoiceActivityAtRef = useRef(0);
   const previousChannelKeyRef = useRef<string | null>(null);
   const intentionalDisconnectRef = useRef(false);
+  const cleanupPromiseRef = useRef<Promise<void> | null>(null);
   const joinGenerationRef = useRef(0);
 
   const remoteParticipantIds = useMemo(
@@ -247,9 +334,6 @@ export function useMobileLiveKitVoiceSession({
 
   const buildParticipantsFromRoom = useCallback(
     (room: Room): VoiceParticipant[] => {
-      const activeSpeakerIds = new Set(
-        room.activeSpeakers.map((participant) => participant.identity),
-      );
       return Array.from(room.remoteParticipants.values()).map(
         (participant: RemoteParticipant) => {
           const micPublication = participant.getTrackPublication(
@@ -259,9 +343,15 @@ export function useMobileLiveKitVoiceSession({
             userId: participant.identity,
             displayName: participant.name || participant.identity,
             avatarUrl: tryParseAvatarUrl(participant.metadata),
-            isSpeaking: activeSpeakerIds.has(participant.identity),
-            muted: !micPublication || micPublication.isMuted,
-            deafened: false,
+            sessionId: readVoiceControlSessionId(participant.metadata),
+            isSpeaking:
+              speakingRef.current.get(participant.identity) ??
+              participant.isSpeaking,
+            muted:
+              !micPublication ||
+              micPublication.isMuted ||
+              readVoiceHardMuted(participant.metadata),
+            deafened: readVoiceDeafened(participant.metadata),
           };
         },
       );
@@ -272,6 +362,7 @@ export function useMobileLiveKitVoiceSession({
   const applyParticipants = useCallback(
     (room: Room) => {
       const next = buildParticipantsFromRoom(room);
+      core.voice.setParticipantSessions(next);
       setParticipants(next);
       core.voice.setParticipants(
         next.map((participant) => ({
@@ -318,74 +409,201 @@ export function useMobileLiveKitVoiceSession({
 
   const startInputLevelPolling = useCallback(() => {
     stopInputLevelPolling();
-    inputLevelIntervalRef.current = setInterval(() => {
+    const gate = new VoiceInputGate();
+    const generation = joinGenerationRef.current;
+    let source = "sender-stats";
+    let sampleAgeMs = -1;
+    let previousTraceState = "";
+    let lastTraceAt = -Infinity;
+    // iOS sender stats report zero while the gate has the encoding
+    // deactivated, so the gate reopens from the native capture monitor; a
+    // stale monitor falls back to sender stats rather than holding the gate.
+    const captureLevelSource: VoiceCaptureLevelSource | undefined =
+      Platform.OS === "ios"
+        ? {
+            get: () => {
+              const sample = nativeCaptureSampleRef.current;
+              sampleAgeMs = sample ? Date.now() - sample.updatedAt : -1;
+              const fresh =
+                sample !== null &&
+                sampleAgeMs <= NATIVE_CAPTURE_LEVEL_MAX_AGE_MS;
+              source = fresh ? "native-capture" : "sender-stats";
+              return fresh ? sample.level : undefined;
+            },
+          }
+        : undefined;
+    let sampling = false;
+    inputLevelIntervalRef.current = setInterval(async () => {
       const room = roomRef.current;
-      if (!room) return;
-      const level = Math.max(
-        0,
-        Math.min(1, room.localParticipant.audioLevel ?? 0),
-      );
-      const threshold = Math.max(
-        0,
-        Math.min(1, voiceSettingsRef.current.voiceActivationThreshold / 100),
-      );
-      const now = Date.now();
-      if (level >= threshold) {
-        lastVoiceActivityAtRef.current = now;
+      const sender = room?.localParticipant.getTrackPublication(
+        Track.Source.Microphone,
+      )?.audioTrack?.sender;
+      if (!sender || sampling) return;
+      sampling = true;
+      try {
+        let { level, gateOpen } = await gate.sample(
+          sender,
+          voiceSettingsRef.current,
+          () => {
+            const session = core.voice.getSnapshot();
+            return (
+              generation !== joinGenerationRef.current ||
+              session.isMuted ||
+              session.isDeafened
+            );
+          },
+          Date.now(),
+          false,
+          captureLevelSource,
+        );
+        const beforeRecording = core.voice.getSnapshot();
+        if (
+          Platform.OS === "ios" &&
+          !beforeRecording.isMuted &&
+          !beforeRecording.isDeafened &&
+          generation === joinGenerationRef.current
+        )
+          await nativeRecording.ensureRecording();
+        if (
+          generation !== joinGenerationRef.current ||
+          !inputLevelIntervalRef.current
+        )
+          return;
+        const snapshot = core.voice.getSnapshot();
+        const blocked = snapshot.isMuted || snapshot.isDeafened;
+        if (blocked) {
+          level = 0;
+          gateOpen = false;
+        }
+        const settings = voiceSettingsRef.current;
+        const traceState = `${source}:${gateOpen}:${blocked}:${settings.transmissionMode}:${settings.voiceActivationThreshold}`;
+        const now = Date.now();
+        if (traceState !== previousTraceState || now - lastTraceAt >= 1000) {
+          previousTraceState = traceState;
+          lastTraceAt = now;
+          perfTrace.mark("voice.input-gate", {
+            source,
+            sampleAgeMs,
+            levelPercent: level * 100,
+            threshold: settings.voiceActivationThreshold,
+            mode: settings.transmissionMode,
+            gateOpen,
+            blocked,
+            trackEnabled: sender.track?.enabled ?? false,
+            recording:
+              Platform.OS === "ios" ? AudioDeviceModule.isRecording() : false,
+            prepared:
+              Platform.OS === "ios"
+                ? AudioDeviceModule.isRecordingAlwaysPreparedMode()
+                : false,
+          });
+        }
+        setLocalInputLevel((previous) =>
+          Math.abs(previous - level) > 0.01 ? level : previous,
+        );
+        setVoiceActivityGateOpen((previous) =>
+          previous === gateOpen ? previous : gateOpen,
+        );
+      } catch (error) {
+        if (generation !== joinGenerationRef.current) return;
+        // Do not retry by re-enabling capture after a native control failure.
+        if (sender.track) sender.track.enabled = false;
+        core.voice.setMuted(true);
+        stopInputLevelPolling();
+        setError(
+          getErrorMessage(error, "Could not control microphone transmission."),
+        );
+      } finally {
+        sampling = false;
       }
-      const gateOpen =
-        level >= threshold ||
-        now - lastVoiceActivityAtRef.current <= VOICE_ACTIVITY_GATE_RELEASE_MS;
-      setLocalInputLevel((previous) =>
-        Math.abs(previous - level) > 0.01 ? level : previous,
-      );
-      setVoiceActivityGateOpen((previous) =>
-        previous === gateOpen ? previous : gateOpen,
-      );
     }, INPUT_LEVEL_INTERVAL_MS);
-  }, [stopInputLevelPolling]);
+  }, [core.voice, nativeRecording, stopInputLevelPolling]);
 
-  const cleanupVoiceSession = useCallback(async () => {
-    const room = roomRef.current;
-    joinGenerationRef.current += 1;
-    intentionalDisconnectRef.current = true;
-    stopInputLevelPolling();
-    setJoining(false);
-    setError(null);
-    setNotice(null);
-    setParticipants([]);
-    core.voice.setParticipants([]);
-    core.voice.setVoiceConnected(false);
-    core.voice.setJoined(false);
-    core.voice.setSessionState({
-      joined: false,
-      isMuted: core.voice.getSnapshot().isMuted,
-      isDeafened: core.voice.getSnapshot().isDeafened,
+  const cleanupVoiceSession = useCallback((): Promise<void> => {
+    if (cleanupPromiseRef.current) return cleanupPromiseRef.current;
+    const cleanup = async () => {
+      const room = roomRef.current;
+      const wasJoined = core.voice.getSnapshot().joined;
+      // Level sampling reads the mic track's stats; it must not outlive the
+      // track. Stopping it changes no audio.
+      stopInputLevelPolling();
+      // Before anything else changes, so nothing reconfigures audio under it.
+      if (wasJoined) {
+        pendingCueRef.current = null;
+        await playMobileVoiceSound(
+          "leave",
+          core.voice.getSnapshot().soundSettings,
+        ).catch(() => false);
+      }
+      // Stop recording before disabling the track, as mute does. A disabled
+      // track over a still-recording engine is a voice-processing input mute,
+      // and iOS plays its system mic sound for that (heard as a Siri-like tone).
+      let recordingError: unknown = null;
+      try {
+        await setNativeRecording(false);
+      } catch (error) {
+        recordingError = error;
+      }
+      room?.localParticipant.audioTrackPublications.forEach((publication) => {
+        const track = publication.audioTrack?.mediaStreamTrack;
+        if (track) track.enabled = false;
+      });
+      joinGenerationRef.current += 1;
+      intentionalDisconnectRef.current = true;
+      setLocalMicTrack(null);
+      setJoining(false);
+      setError(null);
+      setNotice(null);
+      setParticipants([]);
+      core.voice.setParticipants([]);
+      core.voice.setVoiceConnected(false);
+      core.voice.setJoined(false);
+      core.voice.setSessionState({
+        joined: false,
+        isMuted: core.voice.getSnapshot().isMuted,
+        isDeafened: core.voice.getSnapshot().isDeafened,
+      });
+      try {
+        await core.voice.disconnectKickChannel();
+      } catch {
+        // The kick channel is best-effort cleanup.
+      }
+      try {
+        await core.voice.disconnectPresenceChannel();
+      } catch {
+        // Presence cleanup is best-effort; Supabase also removes presence on socket close.
+      }
+      try {
+        await room?.disconnect();
+      } catch {
+        // Ignore disconnect races.
+      }
+      if (recordingError)
+        setError(
+          getErrorMessage(
+            recordingError,
+            "Could not stop microphone recording.",
+          ),
+        );
+      nativeCaptureSampleRef.current = null;
+      try {
+        await AudioSession.stopAudioSession();
+      } catch {
+        // Native audio session might already be stopped.
+      }
+      await stopVoiceForegroundService();
+      setConnectionState(ConnectionState.Disconnected);
+      intentionalDisconnectRef.current = false;
+    };
+    // Leave, channel switching and unmount can request teardown together.
+    // Share the whole teardown, including the cue, before a new join starts.
+    const pending = cleanup().finally(() => {
+      if (cleanupPromiseRef.current === pending)
+        cleanupPromiseRef.current = null;
     });
-    try {
-      await core.voice.disconnectKickChannel();
-    } catch {
-      // The kick channel is best-effort cleanup.
-    }
-    try {
-      await core.voice.disconnectPresenceChannel();
-    } catch {
-      // Presence cleanup is best-effort; Supabase also removes presence on socket close.
-    }
-    try {
-      room?.disconnect();
-    } catch {
-      // Ignore disconnect races.
-    }
-    try {
-      await AudioSession.stopAudioSession();
-    } catch {
-      // Native audio session might already be stopped.
-    }
-    await stopVoiceForegroundService();
-    setConnectionState(ConnectionState.Disconnected);
-    intentionalDisconnectRef.current = false;
-  }, [core.voice, stopInputLevelPolling]);
+    cleanupPromiseRef.current = pending;
+    return pending;
+  }, [core.voice, setNativeRecording, stopInputLevelPolling]);
 
   const joinVoiceChannel = useCallback(async () => {
     const targetChannel = activeChannelRef.current;
@@ -404,24 +622,22 @@ export function useMobileLiveKitVoiceSession({
     setNotice(null);
     intentionalDisconnectRef.current = false;
     const joinGeneration = (joinGenerationRef.current += 1);
-    const timer = createVoiceJoinTimer(targetChannel.channelName);
-    timer.mark("start", { channelId: targetChannel.channelId });
+    const timer = createVoiceJoinTimer(targetChannel.channelId);
+    timer.mark("start");
+    let joinFailed = false;
 
     try {
       await ensureAndroidVoicePermissions();
-      timer.mark("permissions ready");
+      timer.mark("permissions-ready");
 
       const credentialsPromise = core.voice
-        .fetchJoinCredentials(
-          targetChannel.communityId,
-          targetChannel.channelId,
-        )
+        .fetchJoinCredentials(targetChannel.channelId)
         .then((credentials) => {
-          timer.mark("token ready");
+          timer.mark("token-ready");
           return credentials;
         });
       void credentialsPromise.catch(() => {});
-      timer.mark("token request started");
+      timer.mark("token-request-started");
 
       await AudioSession.configureAudio({
         android: {
@@ -430,41 +646,54 @@ export function useMobileLiveKitVoiceSession({
         },
         ios: { defaultOutput: "speaker" },
       });
-      timer.mark("audio configured");
+      timer.mark("audio-configured");
       await AudioSession.startAudioSession();
-      timer.mark("audio session started");
+      timer.mark("audio-session-started");
       await refreshAudioOutputs();
-      timer.mark("audio outputs refreshed");
+      timer.mark("audio-outputs-refreshed");
       await startVoiceForegroundService(targetChannel.channelName);
-      timer.mark("foreground service ready");
+      timer.mark("foreground-service-ready");
 
       const room = roomRef.current ?? createRoom();
+      const controlSessionId = createVoiceControlSessionId();
       roomRef.current = room;
       const { token, serverUrl } = await credentialsPromise;
 
-      timer.mark("room connect started");
+      timer.mark("room-connect-started");
       await room.connect(serverUrl, token, { autoSubscribe: true });
-      timer.mark("room connected");
+      timer.mark("room-connected");
 
       void room.localParticipant
-        .setMetadata(JSON.stringify({ avatarUrl: user.avatarUrl ?? null }))
+        .setMetadata(
+          JSON.stringify({
+            avatarUrl: user.avatarUrl ?? null,
+            voiceSessionId: controlSessionId,
+            deafened: core.voice.getSnapshot().isDeafened,
+            hardMuted: core.voice.getSnapshot().isMuted,
+          }),
+        )
         .then(() => {
-          timer.mark("local metadata set");
+          timer.mark("local-metadata-set");
         })
-        .catch((metadataError: unknown) => {
-          timer.mark("local metadata failed", {
-            message: getErrorMessage(metadataError, "Unknown metadata error."),
-          });
+        .catch(() => {
+          timer.mark("local-metadata-failed");
         });
-      timer.mark("local metadata queued");
+      timer.mark("local-metadata-queued");
+      const snapshot = core.voice.getSnapshot();
+      await setNativeRecording(!snapshot.isMuted && !snapshot.isDeafened);
       await room.localParticipant.setMicrophoneEnabled(true);
-      timer.mark("microphone enabled");
+      timer.mark("microphone-enabled");
+      setLocalMicTrack(
+        room.localParticipant.getTrackPublication(Track.Source.Microphone)
+          ?.audioTrack ?? null,
+      );
       if (selectedOutputDeviceId !== "default" || Platform.OS === "ios") {
         await AudioSession.selectAudioOutput(selectedOutputDeviceId).catch(
           () => {},
         );
       }
-      timer.mark("audio output selected");
+      timer.mark("audio-output-selected");
+      void playMobileVoiceSound("join", core.voice.getSnapshot().soundSettings);
 
       core.voice.setJoined(true);
       core.voice.setVoiceConnected(true);
@@ -487,23 +716,36 @@ export function useMobileLiveKitVoiceSession({
           avatarUrl: user.avatarUrl ?? null,
         })
         .then(() => {
-          timer.mark("presence published");
+          timer.mark("presence-published");
         })
         .catch((presenceError) => {
           console.warn(
             "[voice] Failed to publish voice presence.",
             presenceError,
           );
-          timer.mark("presence publish failed", {
-            message: getErrorMessage(
-              presenceError,
-              "Failed to publish voice presence.",
-            ),
-          });
+          timer.mark("presence-publish-failed");
         });
 
       void core.voice
         .connectKickChannel({
+          sessionId: controlSessionId,
+          onControl: (event) => {
+            const room = roomRef.current;
+            if (room)
+              void room.localParticipant
+                .setMetadata(
+                  mergeVoiceMetadata(room.localParticipant.metadata, {
+                    deafened: core.voice.getSnapshot().isDeafened,
+                    hardMuted: core.voice.getSnapshot().isMuted,
+                  }),
+                )
+                .catch(() => {});
+            if (event.action !== "remove")
+              void playMobileVoiceSound(
+                event.action,
+                core.voice.getSnapshot().soundSettings,
+              );
+          },
           communityId: targetChannel.communityId,
           channelId: targetChannel.channelId,
           currentUserId: user.id,
@@ -543,12 +785,14 @@ export function useMobileLiveKitVoiceSession({
         joinError,
         "Failed to join voice channel.",
       );
-      timer.mark("failed", { message });
+      joinFailed = true;
+      timer.mark("failed");
       core.voice.setError(message);
       await cleanupVoiceSession();
       setError(message);
       onSessionErrorRef.current?.(message);
     } finally {
+      timer.finish(joinFailed);
       setJoining(false);
     }
   }, [
@@ -559,19 +803,42 @@ export function useMobileLiveKitVoiceSession({
     refreshAudioOutputs,
     selectedOutputDeviceId,
     startInputLevelPolling,
+    setNativeRecording,
   ]);
 
   const toggleMute = useCallback(() => {
     const next = !core.voice.getSnapshot().isMuted;
-    core.voice.setIsMuted(next);
+    core.voice.setMuted(next);
+    const room = roomRef.current;
+    if (room)
+      void room.localParticipant
+        .setMetadata(
+          mergeVoiceMetadata(room.localParticipant.metadata, {
+            hardMuted: next,
+          }),
+        )
+        .catch(() => {});
     playVoiceControlFeedback(next);
-  }, [core.voice]);
+    playCue(next ? "mute" : "unmute");
+  }, [core.voice, playCue]);
 
   const toggleDeafen = useCallback(() => {
     const next = !core.voice.getSnapshot().isDeafened;
-    core.voice.setIsDeafened(next);
+    core.voice.setDeafened(next);
+    const room = roomRef.current;
+    if (room) {
+      void room.localParticipant
+        .setMetadata(
+          mergeVoiceMetadata(room.localParticipant.metadata, {
+            deafened: next,
+            hardMuted: core.voice.getSnapshot().isMuted,
+          }),
+        )
+        .catch(() => {});
+    }
     playVoiceControlFeedback(next);
-  }, [core.voice]);
+    playCue(next ? "deafen" : "undeafen");
+  }, [core.voice, playCue]);
 
   const updateVoiceSettingsPatch = useCallback(
     (patch: Partial<VoiceSettings>) => {
@@ -636,6 +903,13 @@ export function useMobileLiveKitVoiceSession({
       }
     };
     const handleDisconnected = () => {
+      stopInputLevelPolling();
+      void setNativeRecording(false).catch((error) => {
+        setError(
+          getErrorMessage(error, "Could not stop microphone recording."),
+        );
+      });
+      setLocalMicTrack(null);
       setConnectionState(ConnectionState.Disconnected);
       core.voice.setVoiceConnected(false);
       if (!intentionalDisconnectRef.current) {
@@ -672,28 +946,54 @@ export function useMobileLiveKitVoiceSession({
         .off(RoomEvent.ParticipantMetadataChanged, syncParticipants)
         .off(RoomEvent.ParticipantNameChanged, syncParticipants);
     };
-  }, [applyParticipants, core.voice]);
+  }, [
+    applyParticipants,
+    core.voice,
+    setNativeRecording,
+    stopInputLevelPolling,
+  ]);
+
+  useEffect(() => {
+    if (!joined || !roomRef.current) {
+      speakingRef.current = new Map();
+      setLocalSpeaking(false);
+      return;
+    }
+    const room = roomRef.current;
+    return monitorSpeaking(room, (speaking) => {
+      speakingRef.current = speaking;
+      setLocalSpeaking(speaking.get(room.localParticipant.identity) ?? false);
+      applyParticipants(room);
+    });
+  }, [joined, applyParticipants]);
 
   useEffect(() => {
     if (!joined) return;
     const room = roomRef.current;
     if (!room) return;
-    const baseAllowsSend = !isMuted && !isDeafened;
-    const shouldSend =
-      baseAllowsSend &&
-      (voiceSettings.transmissionMode === "open_mic" || voiceActivityGateOpen);
-
+    // Hard mute/deafen disable capture immediately. The activity gate only
+    // controls RTP encodings, never this source track.
     room.localParticipant.audioTrackPublications.forEach((publication) => {
       const track = publication.audioTrack?.mediaStreamTrack;
-      if (track) track.enabled = shouldSend;
+      if (track) track.enabled = !isMuted && !isDeafened;
     });
-  }, [
-    isDeafened,
-    isMuted,
-    joined,
-    voiceActivityGateOpen,
-    voiceSettings.transmissionMode,
-  ]);
+    nativeCaptureSampleRef.current = null;
+    const playPendingCue = () => {
+      const cue = pendingCueRef.current;
+      pendingCueRef.current = null;
+      if (cue)
+        void playMobileVoiceSound(cue, core.voice.getSnapshot().soundSettings);
+    };
+    void setNativeRecording(!isMuted && !isDeafened)
+      .then(playPendingCue)
+      .catch((error) => {
+        playPendingCue();
+        core.voice.setMuted(true);
+        setError(
+          getErrorMessage(error, "Could not control microphone recording."),
+        );
+      });
+  }, [core.voice, isDeafened, isMuted, joined, setNativeRecording]);
 
   useEffect(() => {
     if (!joined) return;
@@ -746,6 +1046,7 @@ export function useMobileLiveKitVoiceSession({
       notice,
       localInputLevel,
       voiceActivityGateOpen,
+      localSpeaking,
       remoteVolumes,
       outputDevices,
       selectedOutputDeviceId,

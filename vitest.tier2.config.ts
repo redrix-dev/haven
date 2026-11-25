@@ -9,7 +9,11 @@ import solid from "vite-plugin-solid";
 // dev build for the reactive-logic suite). Kept separate so the 170 node tests
 // are untouched. Run via: vitest run --config vitest.tier2.config.ts
 export default defineConfig({
-  plugins: [solid()],
+  // hot: false keeps solid-refresh out of test builds. With it on, every .tsx
+  // imports the virtual module "/@solid-refresh"; Vitest turns that id into
+  // file:///@solid-refresh, which is a valid path on Linux and macOS but has
+  // no drive letter on Windows, so the suite failed to load there.
+  plugins: [solid({ hot: false })],
   resolve: {
     alias: [
       {

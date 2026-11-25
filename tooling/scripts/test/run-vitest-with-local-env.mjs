@@ -1,12 +1,26 @@
 import { execFileSync } from "node:child_process";
+import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveSupabaseLocalEnv } from "./resolve-supabase-local-env.mjs";
+import { waitForRealtime } from "./wait-for-realtime.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../..");
 
 const mode = process.argv[2] ?? "backend";
+// backend mode: optional contract test files to run instead of all of them.
+const onlyFiles = process.argv.slice(3);
+
+const BACKEND_TESTS_DIR = "packages/shared/src/lib/backend/__tests__";
+
+/** Every backend contract test, found on disk so a new file can't be skipped. */
+function listBackendContractTests() {
+  return readdirSync(path.join(repoRoot, BACKEND_TESTS_DIR))
+    .filter((name) => name.endsWith(".contract.test.ts"))
+    .sort()
+    .map((name) => `${BACKEND_TESTS_DIR}/${name}`);
+}
 
 const modeArgs = {
   backend: ["packages/shared/src/lib/backend/__tests__"],
@@ -38,21 +52,16 @@ function getNpxInvocation() {
   }
 }
 
-function runPsqlCleanup(postgresUrl) {
+// Rebuilds TEST: Hearth and clears what the fixture people made (friends,
+// conversations, notifications), so every contract file starts the same.
+function reloadFixtures() {
   execFileSync(
-    "psql",
+    process.execPath,
     [
-      postgresUrl,
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-c",
-      "select test_support.cleanup_fixture_domain_state();",
+      path.join(repoRoot, "tooling/scripts/test/run-supabase-sql-suite.mjs"),
+      "--fixtures-only",
     ],
-    {
-      cwd: repoRoot,
-      stdio: "inherit",
-      shell: false,
-    },
+    { cwd: repoRoot, stdio: ["ignore", "ignore", "inherit"] },
   );
 }
 
@@ -76,18 +85,13 @@ try {
   const localEnv = resolveSupabaseLocalEnv();
   const npx = getNpxInvocation();
   if (mode === "backend") {
-    const backendFiles = [
-      "packages/shared/src/lib/backend/__tests__/notificationBackend.contract.test.ts",
-      "packages/shared/src/lib/backend/__tests__/socialBackend.contract.test.ts",
-      "packages/shared/src/lib/backend/__tests__/directMessageBackend.contract.test.ts",
-      "packages/shared/src/lib/backend/__tests__/moderationBackend.contract.test.ts",
-      "packages/shared/src/lib/backend/__tests__/communityDataBackend.mentions.contract.test.ts",
-    ];
+    const backendFiles =
+      onlyFiles.length > 0 ? onlyFiles : listBackendContractTests();
+    const waited = await waitForRealtime(localEnv);
+    console.log(`[vitest-local-env] realtime delivering after ${waited}ms`);
     for (const file of backendFiles) {
-      console.log(
-        `[vitest-local-env] resetting social/dm fixtures before ${file}`,
-      );
-      runPsqlCleanup(localEnv.POSTGRES_URL);
+      console.log(`[vitest-local-env] reloading fixtures before ${file}`);
+      reloadFixtures();
       runVitestWithEnv(npx, localEnv, [file]);
     }
   } else {

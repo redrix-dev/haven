@@ -1,5 +1,5 @@
-import type { ServerPermissions } from "@shared/lib/backend/types";
-import type { CommunitySettingsTab } from "@shared/core/sessionStorePorts";
+import type { HavenSolidCore } from "@solid-client/core";
+import type { CommunitySettingsTab } from "@solid-client/data/screen";
 
 export type { CommunitySettingsTab };
 
@@ -13,28 +13,19 @@ export const COMMUNITY_SETTINGS_TAB_LABELS: Record<
   invites: "Invites",
 };
 
-/** True when the settings panel has at least one tab to show. */
-export function canOpenCommunitySettingsPanel(
-  perms: ServerPermissions,
-): boolean {
-  return visibleCommunitySettingsTabs(perms).length > 0;
-}
-
-/** Tabs the viewer is allowed to see in the community settings panel. */
+/**
+ * The tabs of the settings panel the person may use, from what the database
+ * says they may do here (`get_my_permissions`). The overview is for everyone:
+ * it is where a member leaves.
+ */
 export function visibleCommunitySettingsTabs(
-  perms: ServerPermissions,
+  core: HavenSolidCore,
+  communityId: string,
 ): CommunitySettingsTab[] {
   const tabs: CommunitySettingsTab[] = ["overview"];
-  if (perms.canCreateChannels || perms.canManageChannelStructure) {
+  if (core.communities.can(communityId, "manage_channels"))
     tabs.push("channels");
-  }
-  if (perms.canManageRoles) tabs.push("roles");
-  if (perms.canManageInvites) tabs.push("invites");
+  if (core.communities.can(communityId, "manage_roles")) tabs.push("roles");
+  if (core.communities.can(communityId, "manage_invites")) tabs.push("invites");
   return tabs;
-}
-
-export function defaultCommunitySettingsTab(
-  perms: ServerPermissions,
-): CommunitySettingsTab | null {
-  return visibleCommunitySettingsTabs(perms)[0] ?? null;
 }

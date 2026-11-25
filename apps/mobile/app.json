@@ -15,6 +15,7 @@
       "expo-font",
       "expo-sharing",
       "expo-dev-client",
+      "expo-splash-screen",
       [
         "@livekit/react-native-expo-plugin",
         {
@@ -29,6 +30,8 @@
       ],
       "@config-plugins/react-native-webrtc",
       "./plugins/withAndroidVoiceForegroundService",
+      "./plugins/withHavenVoiceSounds",
+      "./plugins/withHavenPerfLog",
       "expo-notifications",
       [
         "expo-camera",
@@ -51,6 +54,7 @@
       "react-native-enriched-markdown",
       "expo-build-properties",
       "./plugins/withNewArchPodfileProperties",
+      "./plugins/withPodDeploymentTargetFloor",
       "./plugins/withHavenIOSNative"
     ],
     "ios": {
@@ -66,7 +70,8 @@
         "NSFaceIDUsageDescription": "Allow Haven to use Face ID for secure app access.",
         "NSLocalNetworkUsageDescription": "Haven uses your local network so this development build can find and connect to the Metro bundler on your computer.",
         "NSBonjourServices": ["_expo._tcp", "_http._tcp"],
-        "UIBackgroundModes": ["audio", "voip", "remote-notification"]
+        "UIBackgroundModes": ["audio", "voip", "remote-notification"],
+        "UIViewControllerBasedStatusBarAppearance": true
       }
     },
     "android": {
@@ -92,7 +97,7 @@
         "expo-channel-name": "production"
       }
     },
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "extra": {
       "supabaseUrl": "",
       "supabaseAnonKey": "",

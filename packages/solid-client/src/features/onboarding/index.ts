@@ -1,2 +1,1 @@
-export { OnboardingScreen } from "./OnboardingScreen";
-export { getSolidOnboardingContext } from "./onboardingContext";
+export { OnboardingScreen, TermsScreen } from "./OnboardingScreen";

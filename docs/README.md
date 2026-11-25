@@ -11,20 +11,23 @@ Small on purpose — a handful of living documents plus one detailed-contract fo
 
 - [RELEASE_CADENCE.md](./RELEASE_CADENCE.md) — the three release trains, version semantics, branch workflow, and standard + hotfix paths per platform.
 - [releases/](./releases/) — one file per release tag; the public release-notes source.
+- [LOCAL_NATIVE_TESTING.md](./LOCAL_NATIVE_TESTING.md) — building a `staging` commit locally on each native host for feel testing: unsigned desktop bundles, Release mobile builds without Metro, and confirming which JavaScript is actually running.
+- [DEV_BACKEND.md](./DEV_BACKEND.md) — the shared non-production Supabase stack on flex: `npm run devdb`, pointing web, desktop and mobile builds at it, and the seed packs that can be destroyed and rebuilt.
 
 ## Detailed contracts (`architecture/`)
 
-- [HAVEN_CORE.md](./architecture/HAVEN_CORE.md) — the data-layer contract: core, caches/nexuses, host boundaries, enforcement. The Solid core mirrors it.
+- [DATABASE.md](./architecture/DATABASE.md) — the database: every table, who may read and change it, the RPCs, the realtime events. The apps follow it.
+- [COLLECTIONS.md](./architecture/COLLECTIONS.md) — the data layer: the collections that hold the app's copy of the database, the shared `HavenCore` over them, what the device keeps.
+- [BOOTSTRAP.md](./architecture/BOOTSTRAP.md) — how each app goes from launch to a signed-in session, and back.
 - [SOLID_CLIENT_SHAPE.md](./architecture/SOLID_CLIENT_SHAPE.md) — the desktop/web client's shape law: feature slices, routes, layering boundaries.
-- [REALTIME.md](./architecture/REALTIME.md) — the realtime event contract and coverage matrix.
+- [REALTIME.md](./architecture/REALTIME.md) — what each realtime event does.
 - [LINKS.md](./architecture/LINKS.md) — one link model and one pipeline for invites, notifications and auth emails: parsing, pending links, the auth landing page, per-platform delivery, and the scheme-ownership traps.
 - [NATIVE_VOICE.md](./architecture/NATIVE_VOICE.md) — the Linux native voice sidecar: its seam, the stdio protocol, and the unreleased libwebrtc pin (with the watch/upgrade procedure). Kept but not shipped since 2.1.0; the doc opens with what bringing Linux back costs.
-- [nexus-framework.html](./architecture/nexus-framework.html) — standalone visual walkthrough of the Nexus architecture (open in a browser).
 
 ## Agent handoff
 
 - [../AGENTS.md](../AGENTS.md) — quick index for future maintainers and coding agents.
-- [.claude/skills/](../.claude/skills/) — narrow, task-specific SKILL.md files for branch discipline, shared boundaries, Solid reactivity, Solid slices/nexuses, Tauri desktop, mobile, Supabase, and native voice work. They live under `.claude/` so coding agents load them automatically; they are still hand-maintained docs and `npm run check:agent-skills` gates their shape.
+- [.claude/skills/](../.claude/skills/) — narrow, task-specific SKILL.md files for branch discipline, shared boundaries, Solid reactivity, Solid slices, Tauri desktop, mobile, Supabase, and native voice work. They live under `.claude/` so coding agents load them automatically; they are still hand-maintained docs and `npm run check:agent-skills` gates their shape.
 
 ## Rules for these docs
 

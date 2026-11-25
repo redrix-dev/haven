@@ -17,7 +17,7 @@ export function getHavenSolidCore(): HavenSolidCore | null {
 export function requireHavenSolidCore(): HavenSolidCore {
   if (!currentCore) {
     throw new Error(
-      "HavenSolidCore is not initialized. The host app must call createSolidHavenCore({ client, publicConfig, persistence }) before rendering.",
+      "HavenSolidCore is not initialized. The host app must call createSolidHavenCore({ client, persistence, context }) before rendering.",
     );
   }
   return currentCore;

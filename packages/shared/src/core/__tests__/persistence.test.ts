@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMemoryPersistence } from "@shared/core";
+import { createMemoryPersistence } from "@shared/core/persistence/createMemoryPersistence";
 
 describe("createMemoryPersistence", () => {
   it("returns null for unset keys", () => {

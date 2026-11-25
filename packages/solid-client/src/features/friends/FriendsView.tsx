@@ -1,170 +1,130 @@
-import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
-import { useNavigate } from "@solidjs/router";
-import { Ban, Check, MessageCircle, Search, UserPlus, X } from "lucide-solid";
-import type { FriendsPanelTab } from "@shared/types/types";
-import type {
-  BlockedUserSummary,
-  FriendRequestSummary,
-  FriendSearchResult,
-  FriendSummary,
-} from "@shared/lib/backend/types";
-import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
 import {
-  resolveLiveAvatarUrl,
-  resolveLiveUsername,
-  type LiveProfilesRecord,
-} from "@shared/lib/liveProfiles";
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  untrack,
+  type JSX,
+} from "solid-js";
+import { useNavigate, useSearchParams } from "@solidjs/router";
+import {
+  Check,
+  Copy,
+  Link2,
+  MessageCircle,
+  Search,
+  Trash2,
+  UserMinus,
+} from "lucide-solid";
+import type { FriendLink } from "@shared/lib/backend/records";
+import {
+  friendIds,
+  incomingRequests,
+  outgoingRequests,
+  usableLinks,
+} from "@shared/collections/social/selectors";
+import { buildHavenLink } from "@shared/features/links";
+import { getErrorMessage } from "@shared/infrastructure/platform/lib/errors";
+import { Avatar, Button, ConfirmDialog } from "@solid-client/components/ui";
 import { requireHavenSolidCore } from "@solid-client/core";
-import { Avatar, Button } from "@solid-client/components/ui";
+import { usePeople } from "@solid-client/contexts/PeopleProvider";
+import { useToast } from "@solid-client/contexts/ToastProvider";
 
-const TABS: { id: FriendsPanelTab; label: string }[] = [
+type Tab = "friends" | "requests" | "add" | "blocked";
+
+const TABS: { id: Tab; label: string }[] = [
   { id: "friends", label: "Friends" },
-  { id: "add", label: "Add" },
   { id: "requests", label: "Requests" },
+  { id: "add", label: "Add friend" },
   { id: "blocked", label: "Blocked" },
 ];
 
+/**
+ * /friends: the person's friends, the requests waiting on either side, ways
+ * to add someone (an exact username, or a friend link they hand out), and
+ * who they blocked. Who may send them a request is their own setting
+ * (Settings → Privacy); the database applies it.
+ */
 export function FriendsView() {
   const core = requireHavenSolidCore();
+  const toast = useToast();
+  const people = usePeople();
   const navigate = useNavigate();
-  const counts = core.social.counts();
-  const friends = core.social.friends();
-  const requests = core.social.friendRequests();
-  const blockedUsers = core.social.blockedUsers();
-  const loading = core.social.loading();
-  const liveProfiles = core.profiles.liveProfiles();
+  const [params] = useSearchParams();
+  const me = () => core.userId ?? "";
+  const social = core.stores.social;
 
-  const [activeTab, setActiveTab] = createSignal<FriendsPanelTab>("friends");
-  const [loadError, setLoadError] = createSignal<string | null>(null);
-  const [actionError, setActionError] = createSignal<string | null>(null);
-  const [actionNotice, setActionNotice] = createSignal<string | null>(null);
-  const [busyActionKey, setBusyActionKey] = createSignal<string | null>(null);
-  const [searchQuery, setSearchQuery] = createSignal("");
-  const [searchResults, setSearchResults] = createSignal<FriendSearchResult[]>(
-    [],
+  const [tab, setTab] = createSignal<Tab>(
+    params.tab === "requests" ? "requests" : "friends",
   );
-  const [searchLoading, setSearchLoading] = createSignal(false);
-  const [searchError, setSearchError] = createSignal<string | null>(null);
+  const [busy, setBusy] = createSignal<string | null>(null);
+  const [removeTarget, setRemoveTarget] = createSignal<string | null>(null);
 
-  const incomingRequests = createMemo(() =>
-    requests().filter((request) => request.direction === "incoming"),
+  const friends = createMemo(() =>
+    friendIds(social, me())
+      .map((id) => ({ id, name: core.nameOf(id) }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
   );
-  const outgoingRequests = createMemo(() =>
-    requests().filter((request) => request.direction === "outgoing"),
-  );
+  const incoming = createMemo(() => incomingRequests(social, me()));
+  const outgoing = createMemo(() => outgoingRequests(social, me()));
+  const blocked = createMemo(() => Object.values(social.blocks));
 
   createEffect(() => {
-    setLoadError(null);
-    void core.social.ensureLoaded().catch((error) => {
-      setLoadError(getErrorMessage(error, "Failed to load friends."));
-    });
+    const ids = [
+      ...friends().map((f) => f.id),
+      ...incoming().map((r) => r.sender_id),
+      ...outgoing().map((r) => r.recipient_id),
+      ...blocked().map((b) => b.blocked_id),
+    ];
+    untrack(() => void core.profiles.ensure(ids));
   });
 
-  createEffect(() => {
-    const query = searchQuery().trim();
-    if (query.length < 2) {
-      setSearchResults([]);
-      setSearchError(null);
-      setSearchLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setSearchLoading(true);
-    setSearchError(null);
-    void core.social
-      .searchUsers(query)
-      .then((results) => {
-        if (!cancelled) setSearchResults(results);
-      })
-      .catch((error) => {
-        if (cancelled) return;
-        setSearchError(getErrorMessage(error, "Search failed."));
-        setSearchResults([]);
-      })
-      .finally(() => {
-        if (!cancelled) setSearchLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  const refresh = async () => {
-    setLoadError(null);
-    try {
-      await core.social.load();
-    } catch (error) {
-      setLoadError(getErrorMessage(error, "Failed to load friends."));
-    }
-  };
-
-  const runMutation = async (
-    actionKey: string,
-    successMessage: string,
-    fn: () => Promise<void>,
+  const act = async (
+    key: string,
+    work: () => Promise<unknown>,
+    done?: string,
   ) => {
-    if (busyActionKey()) return;
-    setBusyActionKey(actionKey);
-    setActionError(null);
-    setActionNotice(null);
+    setBusy(key);
     try {
-      await fn();
-      setActionNotice(successMessage);
+      await work();
+      if (done) toast.show({ title: done });
     } catch (error) {
-      setActionError(getErrorMessage(error, "Action failed."));
+      toast.show({
+        title: "That didn't work",
+        body: getErrorMessage(error, "Try again in a moment."),
+      });
     } finally {
-      setBusyActionKey(null);
+      setBusy(null);
     }
   };
 
-  const friendLabel = (friend: FriendSummary): string =>
-    resolveLiveUsername(
-      liveProfiles(),
-      friend.friendUserId,
-      friend.username,
-    )?.trim() || friend.username;
-
-  const startDirectMessage = async (friend: FriendSummary) => {
-    await runMutation(
-      `dm:${friend.friendUserId}`,
-      "Conversation opened.",
-      async () => {
-        const conversationId = await core.directMessages.openWithUser(
-          friend.friendUserId,
-        );
-        navigate(`/direct-messages/${conversationId}`);
-      },
-    );
-  };
+  const message = (userId: string) =>
+    act(`dm:${userId}`, async () => {
+      const channelId = await core.openConversationWith(userId);
+      navigate(`/direct-messages/${channelId}`);
+    });
 
   return (
     <div class="flex h-full min-w-0 flex-1 bg-surface-app">
-      <aside class="flex w-64 shrink-0 flex-col border-r border-border bg-surface-panel">
+      <aside class="flex w-56 shrink-0 flex-col border-r border-border bg-surface-panel">
         <header class="flex h-12 shrink-0 items-center border-b border-border px-4">
           <h1 class="text-sm font-semibold text-foreground">Friends</h1>
         </header>
         <nav class="flex flex-col gap-1 p-2">
           <For each={TABS}>
-            {(tab) => (
+            {(item) => (
               <button
                 class="flex w-full items-center justify-between rounded px-3 py-2 text-left text-sm text-body-soft hover:bg-surface-list-hover hover:text-foreground"
                 classList={{
-                  "bg-surface-row-selected text-foreground":
-                    activeTab() === tab.id,
+                  "bg-surface-row-selected text-foreground": tab() === item.id,
                 }}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setTab(item.id)}
               >
-                <span>{tab.label}</span>
-                <Show
-                  when={
-                    tab.id === "requests" &&
-                    counts().incomingPendingRequestCount > 0
-                  }
-                >
+                <span>{item.label}</span>
+                <Show when={item.id === "requests" && incoming().length > 0}>
                   <span class="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
-                    {counts().incomingPendingRequestCount}
+                    {incoming().length}
                   </span>
                 </Show>
               </button>
@@ -173,469 +133,453 @@ export function FriendsView() {
         </nav>
       </aside>
 
-      <main class="flex min-w-0 flex-1 flex-col">
-        <header class="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-          <div>
-            <h2 class="text-sm font-semibold text-foreground">
-              {TABS.find((tab) => tab.id === activeTab())?.label ?? "Friends"}
-            </h2>
-            <p class="text-xs text-muted-foreground">
-              {activeTab() === "friends"
-                ? `${counts().friendsCount} friends`
-                : activeTab() === "requests"
-                  ? `${incomingRequests().length} incoming, ${
-                      outgoingRequests().length
-                    } outgoing`
-                  : activeTab() === "blocked"
-                    ? `${counts().blockedUserCount} blocked`
-                    : "Search by username"}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={loading()}
-            onClick={() => void refresh()}
+      <main class="min-h-0 flex-1 overflow-y-auto p-4">
+        <Show when={tab() === "friends"}>
+          <Show
+            when={friends().length > 0}
+            fallback={<Empty>No friends yet. Add someone you know.</Empty>}
           >
-            Refresh
-          </Button>
-        </header>
-
-        <div class="min-h-0 flex-1 overflow-y-auto p-4">
-          <Show when={loadError()}>
-            <p class="mb-3 rounded border border-border bg-surface-panel px-3 py-2 text-sm text-send-error">
-              {loadError()}
-            </p>
-          </Show>
-          <Show when={actionError()}>
-            <p class="mb-3 rounded border border-border bg-surface-panel px-3 py-2 text-sm text-send-error">
-              {actionError()}
-            </p>
-          </Show>
-          <Show when={actionNotice()}>
-            <p class="mb-3 rounded border border-border bg-surface-panel px-3 py-2 text-sm text-muted-foreground">
-              {actionNotice()}
-            </p>
-          </Show>
-          <Show when={loading()}>
-            <p class="mb-3 text-sm text-muted-foreground">Loading...</p>
-          </Show>
-
-          <Show when={activeTab() === "friends"}>
-            <FriendsList
-              friends={friends()}
-              busyActionKey={busyActionKey()}
-              labelForFriend={friendLabel}
-              liveProfiles={liveProfiles()}
-              onStartDirectMessage={(friend) => void startDirectMessage(friend)}
-            />
-          </Show>
-
-          <Show when={activeTab() === "add"}>
-            <AddFriendPanel
-              query={searchQuery()}
-              results={searchResults()}
-              loading={searchLoading()}
-              error={searchError()}
-              busyActionKey={busyActionKey()}
-              onQueryChange={setSearchQuery}
-              onSendRequest={(result) =>
-                void runMutation(
-                  `send:${result.username}`,
-                  `Friend request sent to ${result.username}.`,
-                  async () => {
-                    await core.social.sendFriendRequest(result.username);
-                  },
-                )
-              }
-            />
-          </Show>
-
-          <Show when={activeTab() === "requests"}>
-            <RequestsPanel
-              incoming={incomingRequests()}
-              outgoing={outgoingRequests()}
-              busyActionKey={busyActionKey()}
-              onAccept={(request) =>
-                void runMutation(
-                  `accept:${request.requestId}`,
-                  `${request.senderUsername} is now your friend.`,
-                  async () => {
-                    await core.social.acceptFriendRequest(request.requestId);
-                  },
-                )
-              }
-              onDecline={(request) =>
-                void runMutation(
-                  `decline:${request.requestId}`,
-                  "Friend request declined.",
-                  async () => {
-                    await core.social.declineFriendRequest(request.requestId);
-                  },
-                )
-              }
-              onCancel={(request) =>
-                void runMutation(
-                  `cancel:${request.requestId}`,
-                  "Friend request canceled.",
-                  async () => {
-                    await core.social.cancelFriendRequest(request.requestId);
-                  },
-                )
-              }
-            />
-          </Show>
-
-          <Show when={activeTab() === "blocked"}>
-            <BlockedPanel
-              blockedUsers={blockedUsers()}
-              busyActionKey={busyActionKey()}
-              onUnblock={(blockedUser) =>
-                void runMutation(
-                  `unblock:${blockedUser.blockedUserId}`,
-                  `${blockedUser.username} was unblocked.`,
-                  async () => {
-                    await core.social.unblockUser(blockedUser.blockedUserId);
-                  },
-                )
-              }
-            />
-          </Show>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-function FriendsList(props: {
-  friends: FriendSummary[];
-  busyActionKey: string | null;
-  labelForFriend: (friend: FriendSummary) => string;
-  liveProfiles: LiveProfilesRecord;
-  onStartDirectMessage: (friend: FriendSummary) => void;
-}) {
-  return (
-    <Show
-      when={props.friends.length > 0}
-      fallback={
-        <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-          No friends yet.
-        </div>
-      }
-    >
-      <div class="divide-y divide-border">
-        <For each={props.friends}>
-          {(friend) => {
-            const label = () => props.labelForFriend(friend);
-            const avatarUrl = () =>
-              resolveLiveAvatarUrl(
-                props.liveProfiles,
-                friend.friendUserId,
-                friend.avatarUrl,
-              );
-            return (
-              <div class="flex items-center gap-3 py-3">
-                <Avatar src={avatarUrl()} name={label()} size="lg" />
-                <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm font-semibold text-foreground">
-                    {label()}
-                  </p>
-                  <p class="truncate text-xs text-muted-foreground">
-                    {friend.mutualCommunityCount > 0
-                      ? `${friend.mutualCommunityCount} mutual ${
-                          friend.mutualCommunityCount === 1
-                            ? "server"
-                            : "servers"
-                        }`
-                      : "No mutual servers"}
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={props.busyActionKey !== null}
-                  onClick={() => props.onStartDirectMessage(friend)}
+            <For each={friends()}>
+              {(friend) => (
+                <PersonRow
+                  userId={friend.id}
+                  name={friend.name}
+                  onOpen={() => people.openProfile(friend.id)}
                 >
-                  <MessageCircle size={15} />
-                  Message
-                </Button>
-              </div>
-            );
-          }}
-        </For>
-      </div>
-    </Show>
-  );
-}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy() !== null}
+                    onClick={() => void message(friend.id)}
+                  >
+                    <MessageCircle size={15} />
+                    Message
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy() !== null}
+                    onClick={() => setRemoveTarget(friend.id)}
+                  >
+                    <UserMinus size={15} />
+                  </Button>
+                </PersonRow>
+              )}
+            </For>
+          </Show>
+        </Show>
 
-function AddFriendPanel(props: {
-  query: string;
-  results: FriendSearchResult[];
-  loading: boolean;
-  error: string | null;
-  busyActionKey: string | null;
-  onQueryChange: (query: string) => void;
-  onSendRequest: (result: FriendSearchResult) => void;
-}) {
-  return (
-    <div class="flex h-full min-h-0 flex-col">
-      <label class="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-        Search
-      </label>
-      <div class="mb-3 flex items-center gap-2 rounded-lg border border-input bg-surface-input px-3 py-2">
-        <Search size={16} class="text-muted-foreground" />
-        <input
-          value={props.query}
-          placeholder="Search by username"
-          autocapitalize="none"
-          autocomplete="off"
-          spellcheck={false}
-          onInput={(event) => props.onQueryChange(event.currentTarget.value)}
-          class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
-        />
-      </div>
-      <Show when={props.error}>
-        <p class="mb-3 text-sm text-send-error">{props.error}</p>
-      </Show>
-      <Show when={props.loading}>
-        <p class="mb-3 text-sm text-muted-foreground">Searching...</p>
-      </Show>
-      <Show
-        when={props.query.trim().length >= 2}
-        fallback={
-          <div class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Type at least 2 characters to search.
-          </div>
-        }
-      >
-        <Show
-          when={props.results.length > 0}
-          fallback={
-            <div class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-              No results.
-            </div>
-          }
-        >
-          <div class="divide-y divide-border">
-            <For each={props.results}>
-              {(result) => (
-                <div class="flex items-center gap-3 py-3">
-                  <Avatar
-                    src={result.avatarUrl}
-                    name={result.username}
-                    size="lg"
-                  />
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-semibold text-foreground">
-                      {result.username}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      {relationshipLabel(result)}
-                    </p>
-                  </div>
-                  <Show when={result.relationshipState === "none"}>
+        <Show when={tab() === "requests"}>
+          <Section title="Waiting for you">
+            <Show
+              when={incoming().length > 0}
+              fallback={<Empty>No requests.</Empty>}
+            >
+              <For each={incoming()}>
+                {(request) => (
+                  <PersonRow
+                    userId={request.sender_id}
+                    name={core.nameOf(request.sender_id)}
+                    detail={`Asked ${timeLabel(request.created_at)}`}
+                    onOpen={() => people.openProfile(request.sender_id)}
+                  >
                     <Button
                       size="sm"
-                      disabled={props.busyActionKey !== null}
-                      onClick={() => props.onSendRequest(result)}
+                      disabled={busy() !== null}
+                      onClick={() =>
+                        void act(
+                          request.id,
+                          () => core.social.answerRequest(request.id, true),
+                          "You're friends now",
+                        )
+                      }
                     >
-                      <UserPlus size={15} />
-                      Add
+                      Accept
                     </Button>
-                  </Show>
-                </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy() !== null}
+                      onClick={() =>
+                        void act(request.id, () =>
+                          core.social.answerRequest(request.id, false),
+                        )
+                      }
+                    >
+                      Decline
+                    </Button>
+                  </PersonRow>
+                )}
+              </For>
+            </Show>
+          </Section>
+          <Section title="Sent">
+            <Show
+              when={outgoing().length > 0}
+              fallback={<Empty>Nothing sent.</Empty>}
+            >
+              <For each={outgoing()}>
+                {(request) => (
+                  <PersonRow
+                    userId={request.recipient_id}
+                    name={core.nameOf(request.recipient_id)}
+                    detail={`Sent ${timeLabel(request.created_at)}`}
+                    onOpen={() => people.openProfile(request.recipient_id)}
+                  >
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy() !== null}
+                      onClick={() =>
+                        void act(request.id, () =>
+                          core.social.answerRequest(request.id, false),
+                        )
+                      }
+                    >
+                      Cancel
+                    </Button>
+                  </PersonRow>
+                )}
+              </For>
+            </Show>
+          </Section>
+        </Show>
+
+        <Show when={tab() === "add"}>
+          <AddByUsername />
+          <FriendLinks />
+        </Show>
+
+        <Show when={tab() === "blocked"}>
+          <Show
+            when={blocked().length > 0}
+            fallback={<Empty>Nobody is blocked.</Empty>}
+          >
+            <For each={blocked()}>
+              {(block) => (
+                <PersonRow
+                  userId={block.blocked_id}
+                  name={core.nameOf(block.blocked_id)}
+                  detail="They can't message you, see your details, or ask to be friends."
+                >
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy() !== null}
+                    onClick={() =>
+                      void act(block.blocked_id, () =>
+                        core.social.unblock(block.blocked_id),
+                      )
+                    }
+                  >
+                    Unblock
+                  </Button>
+                </PersonRow>
               )}
             </For>
-          </div>
+          </Show>
         </Show>
-      </Show>
+      </main>
+
+      <ConfirmDialog
+        open={removeTarget() !== null}
+        title={`Remove ${removeTarget() ? core.nameOf(removeTarget()!) : ""}?`}
+        description="You stop being friends. Your conversation stays, if your settings still let you message each other."
+        confirmLabel="Remove"
+        danger
+        pending={busy() !== null}
+        onConfirm={() => {
+          const target = removeTarget();
+          if (!target) return;
+          void act(target, () => core.social.removeFriend(target)).then(() =>
+            setRemoveTarget(null),
+          );
+        }}
+        onCancel={() => setRemoveTarget(null)}
+      />
     </div>
   );
 }
 
-function RequestsPanel(props: {
-  incoming: FriendRequestSummary[];
-  outgoing: FriendRequestSummary[];
-  busyActionKey: string | null;
-  onAccept: (request: FriendRequestSummary) => void;
-  onDecline: (request: FriendRequestSummary) => void;
-  onCancel: (request: FriendRequestSummary) => void;
-}) {
-  return (
-    <div class="grid gap-6">
-      <section>
-        <h3 class="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-          Incoming
-        </h3>
-        <Show
-          when={props.incoming.length > 0}
-          fallback={
-            <p class="py-4 text-sm text-muted-foreground">
-              No pending friend requests.
-            </p>
-          }
-        >
-          <div class="divide-y divide-border">
-            <For each={props.incoming}>
-              {(request) => (
-                <div class="flex items-center gap-3 py-3">
-                  <Avatar
-                    src={request.senderAvatarUrl}
-                    name={request.senderUsername}
-                    size="lg"
-                  />
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-semibold text-foreground">
-                      {request.senderUsername}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      {request.mutualCommunityCount > 0
-                        ? `${request.mutualCommunityCount} mutual ${
-                            request.mutualCommunityCount === 1
-                              ? "server"
-                              : "servers"
-                          }`
-                        : "Incoming request"}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={props.busyActionKey !== null}
-                    onClick={() => props.onAccept(request)}
-                  >
-                    <Check size={15} />
-                    Accept
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={props.busyActionKey !== null}
-                    onClick={() => props.onDecline(request)}
-                  >
-                    <X size={15} />
-                    Decline
-                  </Button>
-                </div>
-              )}
-            </For>
-          </div>
-        </Show>
-      </section>
+/**
+ * Finding someone by their exact username, never by a partial match: nobody
+ * can be found by browsing. Their card says whether they take requests.
+ */
+function AddByUsername() {
+  const core = requireHavenSolidCore();
+  const people = usePeople();
+  const [username, setUsername] = createSignal("");
+  const [looking, setLooking] = createSignal(false);
+  const [notFound, setNotFound] = createSignal(false);
 
-      <section>
-        <h3 class="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-          Outgoing
-        </h3>
-        <Show
-          when={props.outgoing.length > 0}
-          fallback={
-            <p class="py-4 text-sm text-muted-foreground">
-              No outgoing friend requests.
-            </p>
-          }
-        >
-          <div class="divide-y divide-border">
-            <For each={props.outgoing}>
-              {(request) => (
-                <div class="flex items-center gap-3 py-3">
-                  <Avatar
-                    src={request.recipientAvatarUrl}
-                    name={request.recipientUsername}
-                    size="lg"
-                  />
-                  <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm font-semibold text-foreground">
-                      {request.recipientUsername}
-                    </p>
-                    <p class="text-xs text-muted-foreground">Pending</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={props.busyActionKey !== null}
-                    onClick={() => props.onCancel(request)}
-                  >
-                    <X size={15} />
-                    Cancel
-                  </Button>
-                </div>
-              )}
-            </For>
-          </div>
-        </Show>
-      </section>
-    </div>
-  );
-}
-
-function BlockedPanel(props: {
-  blockedUsers: BlockedUserSummary[];
-  busyActionKey: string | null;
-  onUnblock: (blockedUser: BlockedUserSummary) => void;
-}) {
-  return (
-    <Show
-      when={props.blockedUsers.length > 0}
-      fallback={
-        <div class="flex h-full items-center justify-center text-sm text-muted-foreground">
-          No blocked users.
-        </div>
+  const find = async () => {
+    const wanted = username().trim().replace(/^@/, "");
+    if (!wanted) return;
+    setLooking(true);
+    setNotFound(false);
+    try {
+      const found = await core.backend.people.findUser(wanted);
+      if (found && !found.deleted) {
+        core.profiles.applyProfile(found);
+        people.openProfile(found.id);
+      } else {
+        setNotFound(true);
       }
-    >
-      <div class="divide-y divide-border">
-        <For each={props.blockedUsers}>
-          {(blockedUser) => (
-            <div class="flex items-center gap-3 py-3">
-              <Avatar
-                src={blockedUser.avatarUrl}
-                name={blockedUser.username}
-                size="lg"
-              />
-              <div class="min-w-0 flex-1">
-                <p class="truncate text-sm font-semibold text-foreground">
-                  {blockedUser.username}
-                </p>
-                <p class="text-xs text-muted-foreground">
-                  Blocked {timeLabel(blockedUser.blockedAt)}
-                </p>
-              </div>
+    } catch {
+      setNotFound(true);
+    } finally {
+      setLooking(false);
+    }
+  };
+
+  return (
+    <Section title="By username">
+      <form
+        class="flex items-center gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void find();
+        }}
+      >
+        <div class="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-surface-input px-3 py-2">
+          <Search size={16} class="text-muted-foreground" />
+          <input
+            value={username()}
+            placeholder="Their exact username"
+            autocapitalize="none"
+            autocomplete="off"
+            spellcheck={false}
+            onInput={(event) => setUsername(event.currentTarget.value)}
+            class="min-w-0 flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-hidden"
+          />
+        </div>
+        <Button type="submit" size="sm" disabled={looking()}>
+          {looking() ? "Looking…" : "Find"}
+        </Button>
+      </form>
+      <Show when={notFound()}>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Nobody has that username.
+        </p>
+      </Show>
+    </Section>
+  );
+}
+
+const LINK_USES: { label: string; value: number | null }[] = [
+  { label: "1 person", value: 1 },
+  { label: "5 people", value: 5 },
+  { label: "Anyone with it", value: null },
+];
+const LINK_EXPIRY: { label: string; hours: number }[] = [
+  { label: "1 day", hours: 24 },
+  { label: "1 week", hours: 168 },
+  { label: "30 days", hours: 720 },
+];
+
+/**
+ * The person's own friend links. Whoever opens one sees who it is from and
+ * decides; nobody becomes friends by clicking. The owner is told when
+ * someone accepts, and when someone declines (not who).
+ */
+function FriendLinks() {
+  const core = requireHavenSolidCore();
+  const toast = useToast();
+  const links = createMemo(() => usableLinks(core.stores.social));
+  const [uses, setUses] = createSignal<number | null>(1);
+  const [hours, setHours] = createSignal(168);
+  const [creating, setCreating] = createSignal(false);
+  const [copied, setCopied] = createSignal<string | null>(null);
+
+  // The list is not part of the sign-in load; it loads when looked at.
+  createEffect(() => untrack(() => void core.social.loadLinks()));
+
+  const share = async (link: FriendLink) => {
+    const url = buildHavenLink({ kind: "friend_link", code: link.code });
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(link.id);
+      setTimeout(() => setCopied(null), 1500);
+    } catch {
+      toast.show({ title: "Couldn't copy", body: url });
+    }
+  };
+
+  const create = async () => {
+    setCreating(true);
+    try {
+      const link = await core.social.createLink({
+        max_uses: uses(),
+        expires_in_hours: hours(),
+      });
+      await share(link);
+      toast.show({ title: "Friend link copied" });
+    } catch (error) {
+      toast.show({
+        title: "Couldn't make a link",
+        body: getErrorMessage(error, "Try again in a moment."),
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <Section title="Friend links">
+      <p class="mb-3 text-sm text-muted-foreground">
+        Hand a link to someone you know. Opening it asks them whether to accept;
+        nobody becomes your friend just by clicking it.
+      </p>
+      <div class="mb-4 flex flex-wrap items-end gap-3">
+        <Picker
+          label="Works for"
+          value={String(uses())}
+          options={LINK_USES.map((o) => ({
+            label: o.label,
+            value: String(o.value),
+          }))}
+          onChange={(value) => setUses(value === "null" ? null : Number(value))}
+        />
+        <Picker
+          label="For"
+          value={String(hours())}
+          options={LINK_EXPIRY.map((o) => ({
+            label: o.label,
+            value: String(o.hours),
+          }))}
+          onChange={(value) => setHours(Number(value))}
+        />
+        <Button size="sm" disabled={creating()} onClick={() => void create()}>
+          <Link2 size={15} />
+          {creating() ? "Making…" : "Make a link"}
+        </Button>
+      </div>
+      <Show
+        when={links().length > 0}
+        fallback={<Empty>No links that still work.</Empty>}
+      >
+        <For each={links()}>
+          {(link) => (
+            <div class="flex items-center gap-3 border-b border-border py-2 last:border-b-0">
+              <code class="min-w-0 flex-1 truncate text-sm text-foreground">
+                {link.code}
+              </code>
+              <span class="text-xs text-muted-foreground">
+                {link.max_uses === null
+                  ? `${link.uses} used`
+                  : `${link.uses} / ${link.max_uses} used`}
+                {" · until "}
+                {new Date(link.expires_at).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </span>
               <Button
                 size="sm"
-                variant="secondary"
-                disabled={props.busyActionKey !== null}
-                onClick={() => props.onUnblock(blockedUser)}
+                variant="ghost"
+                onClick={() => void share(link)}
               >
-                <Ban size={15} />
-                Unblock
+                <Show when={copied() === link.id} fallback={<Copy size={15} />}>
+                  <Check size={15} />
+                </Show>
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  void core.social.revokeLink(link.id).catch((error: unknown) =>
+                    toast.show({
+                      title: "Couldn't revoke it",
+                      body: getErrorMessage(error, "Try again in a moment."),
+                    }),
+                  )
+                }
+              >
+                <Trash2 size={15} />
               </Button>
             </div>
           )}
         </For>
-      </div>
-    </Show>
+      </Show>
+    </Section>
   );
 }
 
-function relationshipLabel(result: FriendSearchResult): string {
-  if (result.relationshipState === "friend") return "Already friends";
-  if (result.relationshipState === "incoming_pending") {
-    return "Sent you a request";
-  }
-  if (result.relationshipState === "outgoing_pending") return "Request pending";
-  if (result.mutualCommunityCount > 0) {
-    return `${result.mutualCommunityCount} mutual ${
-      result.mutualCommunityCount === 1 ? "server" : "servers"
-    }`;
-  }
-  return "Not connected";
+function Picker(props: {
+  label: string;
+  value: string;
+  options: { label: string; value: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label class="flex flex-col gap-1 text-xs font-medium uppercase text-muted-foreground">
+      {props.label}
+      <select
+        value={props.value}
+        onChange={(e) => props.onChange(e.currentTarget.value)}
+        class="rounded border border-border-control bg-surface-input px-2 py-1.5 text-sm normal-case text-foreground"
+      >
+        <For each={props.options}>
+          {(option) => <option value={option.value}>{option.label}</option>}
+        </For>
+      </select>
+    </label>
+  );
+}
+
+function PersonRow(props: {
+  userId: string;
+  name: string;
+  detail?: string;
+  onOpen?: () => void;
+  children?: JSX.Element;
+}) {
+  const core = requireHavenSolidCore();
+  return (
+    <div class="flex items-center gap-3 border-b border-border py-3 last:border-b-0">
+      <button
+        type="button"
+        class="flex min-w-0 flex-1 items-center gap-3 text-left"
+        disabled={!props.onOpen}
+        onClick={() => props.onOpen?.()}
+      >
+        <Avatar
+          src={core.avatarUrl(props.userId)}
+          name={props.name}
+          size="lg"
+        />
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-semibold text-foreground">
+            {props.name}
+          </p>
+          <Show when={props.detail}>
+            <p class="truncate text-xs text-muted-foreground">{props.detail}</p>
+          </Show>
+        </div>
+      </button>
+      {props.children}
+    </div>
+  );
+}
+
+function Section(props: { title: string; children: JSX.Element }) {
+  return (
+    <section class="mb-6">
+      <h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {props.title}
+      </h2>
+      {props.children}
+    </section>
+  );
+}
+
+function Empty(props: { children: JSX.Element }) {
+  return <p class="py-4 text-sm text-muted-foreground">{props.children}</p>;
 }
 
 function timeLabel(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.valueOf())) return "";
-  return date.toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
-    year: "numeric",
   });
 }

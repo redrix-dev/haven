@@ -73,9 +73,10 @@ signing is independent and does not remove SmartScreen prompts.
 
 - macOS builds universal Apple artifacts with
   `--target universal-apple-darwin`.
-- Linux installs WebKitGTK/appindicator/rsvg/patchelf and ALSA dev packages.
-- Linux alone builds and stages `haven-voice` before `tauri-action`.
-- Windows does not build or stage the Linux sidecar.
+- Linux is not in the release matrix (not shipped since 2.1.0). The code and
+  sidecar stay buildable; the steps to restore the platform are in
+  [docs/architecture/NATIVE_VOICE.md](../../../docs/architecture/NATIVE_VOICE.md).
+- No release job builds or stages the Linux sidecar.
 
 ## Validation
 
@@ -83,7 +84,7 @@ signing is independent and does not remove SmartScreen prompts.
 - `npm run build:solid`
 - `cargo check --manifest-path apps/tauri/src-tauri/Cargo.toml`
 - `cargo build --locked --manifest-path apps/tauri/haven-voice/Cargo.toml`
-  when Linux sidecar or release Linux dependencies changed
+  when the Linux sidecar changed
 - `npm run tauri:build` for local packaged smoke when config/release behavior
   changed
 

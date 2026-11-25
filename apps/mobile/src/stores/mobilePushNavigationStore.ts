@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import type { HavenLinkIntent } from "@shared/features/links";
-import type { ParsedExpoPushPayload } from "@/features/notifications/utils/parseExpoPushNotificationData";
 
 export type MobileFriendsOpenInput = {
   tab: "requests" | "friends";
@@ -14,45 +13,10 @@ export type MobilePushNavigationHandlers = {
   openCommunity: (communityId: string) => void;
   /** Opens the join sheet pre-filled with the code. Joining stays a tap. */
   openInvite: (code: string) => void;
+  /** Shows who a friend link is from and asks; nothing is accepted by opening it. */
+  openFriendLink: (code: string) => void;
   openNotifications: () => void;
-  /** Refresh DM list, social counts, notification inbox when urgent push arrives in foreground. */
-  refreshUrgentSurfaces: () => void;
 };
-
-export function dispatchParsedPayload(
-  handlers: MobilePushNavigationHandlers,
-  parsed: ParsedExpoPushPayload,
-): void {
-  switch (parsed.kind) {
-    case "dm_message":
-      if (parsed.conversationId) {
-        handlers.openDm(parsed.conversationId);
-      } else {
-        handlers.refreshUrgentSurfaces();
-      }
-      break;
-    case "friend_request_received":
-      handlers.openFriends({
-        tab: "requests",
-        highlightedRequestId: parsed.friendRequestId,
-      });
-      break;
-    case "friend_request_accepted":
-      handlers.openFriends({ tab: "friends", highlightedRequestId: null });
-      break;
-    case "channel_mention":
-      if (parsed.communityId && parsed.channelId) {
-        handlers.openMention(parsed.communityId, parsed.channelId);
-      } else {
-        handlers.refreshUrgentSurfaces();
-      }
-      break;
-    case "system":
-    default:
-      handlers.openNotifications();
-      break;
-  }
-}
 
 /** Navigate to where a link points. Links with nowhere to go do nothing. */
 export function dispatchLinkIntent(
@@ -62,6 +26,9 @@ export function dispatchLinkIntent(
   switch (intent.kind) {
     case "invite":
       handlers.openInvite(intent.code);
+      return;
+    case "friend_link":
+      handlers.openFriendLink(intent.code);
       return;
     case "community":
       handlers.openCommunity(intent.communityId);
@@ -91,10 +58,10 @@ export function dispatchLinkIntent(
 type MobilePushNavigationState = {
   handlers: MobilePushNavigationHandlers | null;
   setHandlers: (handlers: MobilePushNavigationHandlers | null) => void;
-  /** Notification that arrived before handlers were registered; dispatched on next setHandlers call. */
-  pendingParsedPayload: ParsedExpoPushPayload | null;
-  setPendingParsedPayload: (payload: ParsedExpoPushPayload | null) => void;
-  /** Link opened before handlers were registered (e.g. right after sign-in); dispatched on next setHandlers call. */
+  /**
+   * A link or push tap that came before the handlers were registered (a cold
+   * start, right after sign-in); dispatched on the next setHandlers call.
+   */
   pendingLinkIntent: HavenLinkIntent | null;
   setPendingLinkIntent: (intent: HavenLinkIntent | null) => void;
 };
@@ -102,16 +69,10 @@ type MobilePushNavigationState = {
 export const useMobilePushNavigationStore = create<MobilePushNavigationState>()(
   (set, get) => ({
     handlers: null,
-    pendingParsedPayload: null,
     pendingLinkIntent: null,
     setHandlers: (handlers) => {
       set({ handlers });
       if (handlers) {
-        const pending = get().pendingParsedPayload;
-        if (pending) {
-          set({ pendingParsedPayload: null });
-          dispatchParsedPayload(handlers, pending);
-        }
         const pendingLink = get().pendingLinkIntent;
         if (pendingLink) {
           set({ pendingLinkIntent: null });
@@ -119,8 +80,6 @@ export const useMobilePushNavigationStore = create<MobilePushNavigationState>()(
         }
       }
     },
-    setPendingParsedPayload: (payload) =>
-      set({ pendingParsedPayload: payload }),
     setPendingLinkIntent: (intent) => set({ pendingLinkIntent: intent }),
   }),
 );

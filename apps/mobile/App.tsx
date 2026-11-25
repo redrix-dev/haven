@@ -1,6 +1,5 @@
 import "react-native-gesture-handler";
-import { bootLogger } from "@shared/debug/bootLogger";
-bootLogger.mark("js-entry");
+import { perfTrace } from "@shared/debug/perfTrace";
 import { PortalHost } from "@rn-primitives/portal";
 import "./global.css";
 
@@ -10,38 +9,37 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { createReactHavenCore } from "@/data/createReactHavenCore";
+import { createReactHavenCore } from "@/data/core";
 import { createMmkvPersistence } from "@/lib/createMmkvPersistence";
 import { registerMobileAppHost } from "@/lib/registerMobileAppHost";
-import {
-  getMobileSupabase,
-  resolveMobileSupabaseConfig,
-} from "@/supabase/getMobileSupabase";
+import { getMobileSupabase } from "@/supabase/getMobileSupabase";
+import { getMobileOnboardingContext } from "@/features/onboarding/mobileOnboardingContext";
 import { useLayoutEffect, useState } from "react";
+import { AppState } from "react-native";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { applyMobileTheme } from "./src/lib/theme";
 import { loadPersistedThemeId } from "./src/storage/mobileThemePreferenceStorage";
 import { useMobileThemePreferenceStore } from "./src/stores/mobileThemePreferenceStore";
-import { bootstrapDataCacheDebug } from "./src/debug/bootstrapDataCacheDebug";
 import { MobileDevToolsOverlay } from "./src/dev/MobileDevToolsOverlay";
 
+perfTrace.mark("app-body-start");
 registerMobileAppHost();
-bootLogger.mark("app-host-registered");
+perfTrace.mark("app-host-registered");
 registerGlobals();
-bootstrapDataCacheDebug();
-
+perfTrace.mark("livekit-globals-registered");
 const mobileClient = getMobileSupabase();
-bootLogger.mark("supabase-client-created");
-const mobileConfig = resolveMobileSupabaseConfig();
-createReactHavenCore({
+perfTrace.mark("supabase-client-created");
+const core = createReactHavenCore({
   client: mobileClient,
-  publicConfig: {
-    supabaseUrl: mobileConfig.supabaseUrl,
-    supabaseAnonKey: mobileConfig.supabaseAnonKey,
-  },
   persistence: createMmkvPersistence(),
+  context: getMobileOnboardingContext(),
 });
-bootLogger.mark("core-created");
+// Device copies are written shortly after a change; write them now when the
+// app leaves the foreground, so nothing typed is lost if it is killed.
+AppState.addEventListener("change", (state) => {
+  if (state !== "active") core.flush();
+});
+perfTrace.mark("core-created");
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -60,6 +58,7 @@ function App() {
 
   useLayoutEffect(() => {
     let cancelled = false;
+    const span = perfTrace.begin("theme-storage");
     void (async () => {
       try {
         const raw = await loadPersistedThemeId();
@@ -67,6 +66,7 @@ function App() {
           useMobileThemePreferenceStore.getState().setSelectedThemeId(raw);
         }
       } finally {
+        span.end();
         if (!cancelled) setThemeStorageReady(true);
       }
     })();

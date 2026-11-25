@@ -6,7 +6,11 @@ export { ProfileCard, ProfileFlair } from "./ProfileCard";
 export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 export { OpenInAppBanner } from "./OpenInAppBanner";
 export { ActionsMenu, type ActionMenuItem } from "./ActionsMenu";
-export { ReportDialog, type ReportDialogResult } from "./ReportDialog";
+export {
+  ReportDialog,
+  type ReportDialogResult,
+  type ReportTarget,
+} from "./ReportDialog";
 export { SidePanel, type SidePanelProps } from "./SidePanel";
 export { Tooltip, type TooltipProps } from "./Tooltip";
 export { Markdown } from "./Markdown/Markdown";

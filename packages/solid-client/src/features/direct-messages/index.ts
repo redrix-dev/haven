@@ -1,1 +1,0 @@
-export { DirectMessagesView } from "./DirectMessagesView";

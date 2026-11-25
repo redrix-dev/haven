@@ -1,16 +1,11 @@
 import React from "react";
-import { useHavenCore } from "@mobile-data";
-import {
-  useVoiceParticipantsByChannel,
-  useVoiceSession,
-} from "@mobile-data/hooks";
-import type { Channel } from "@shared/lib/backend/types";
+import { useHavenCore, useVoiceSession } from "@mobile-data";
+import type { Channel } from "@shared/lib/backend/records";
 import type {
+  ForceDisconnectVoiceReason,
   VoiceChannelReference,
   VoiceSidebarParticipant,
-} from "@shared/types/types";
-import { isEditableKeyboardTarget } from "@shared/infrastructure/utils/appUtils";
-import type { ForceDisconnectVoiceReason } from "@shared/features/voice/types";
+} from "@shared/features/voice/types";
 
 type VoiceControlActions = {
   join: () => void;
@@ -59,8 +54,8 @@ export function useVoice({
   channels,
 }: UseVoiceInput) {
   const core = useHavenCore();
-  const voiceSession = useVoiceSession(core.voice);
-  const voicePresenceByChannelId = useVoiceParticipantsByChannel(core.voice);
+  const voiceSession = useVoiceSession();
+  const voicePresenceByChannelId = voiceSession.participantsByChannelId;
   const activeVoiceChannel = voiceSession.activeChannel;
   const activeVoiceChannelId = activeVoiceChannel?.id ?? null;
   const [voicePanelOpen, setVoicePanelOpen] = React.useState(false);
@@ -79,9 +74,8 @@ export function useVoice({
   );
   const voiceSessionState = storedVoiceSessionState ?? defaultVoiceSessionState;
 
-  // VOICE_NEXUS_RESHAPE_TODO: this wrapper preserves the app-shaped
-  // state/derived/actions contract for now. Later, move callers to direct
-  // core.voice selectors/actions and split browser/RN adapter concerns.
+  // TODO: this wrapper keeps the app-shaped state/derived/actions contract.
+  // Later, move callers to core.voice directly.
 
   const setStoredVoiceConnected = React.useCallback(
     (connected: boolean) => {
@@ -127,10 +121,7 @@ export function useVoice({
 
   const cleanupStaleVoicePresenceChannels = React.useCallback(async () => {
     if (!activeVoiceChannel) return;
-    await core.voice.cleanupPresenceChannel(
-      activeVoiceChannel.community_id,
-      activeVoiceChannel.id,
-    );
+    await core.voice.disconnectPresenceChannel();
   }, [activeVoiceChannel, core]);
 
   const requestVoiceChannelJoin = React.useCallback(
@@ -138,10 +129,10 @@ export function useVoice({
       const targetChannel = channels.find(
         (channel) => channel.id === channelId && channel.kind === "voice",
       );
-      if (!targetChannel) return;
+      if (!targetChannel?.community_id) return;
       const targetVoiceChannel: VoiceChannelReference = {
         id: targetChannel.id,
-        name: targetChannel.name,
+        name: targetChannel.name ?? "Voice",
         community_id: targetChannel.community_id,
       };
 
@@ -244,40 +235,6 @@ export function useVoice({
   React.useEffect(() => {
     if (voiceHardwareDebugPanelEnabled && currentUserId) return;
     setVoiceHardwareDebugPanelOpen(false);
-  }, [currentUserId, voiceHardwareDebugPanelEnabled]);
-
-  React.useEffect(() => {
-    if (!currentUserId || !voiceHardwareDebugPanelEnabled) return;
-
-    const keyboardTarget = globalThis as unknown as {
-      addEventListener?: (type: string, listener: EventListener) => void;
-      removeEventListener?: (type: string, listener: EventListener) => void;
-    };
-    if (
-      typeof keyboardTarget.addEventListener !== "function" ||
-      typeof keyboardTarget.removeEventListener !== "function"
-    ) {
-      return;
-    }
-
-    const handleKeyDown: EventListener = (event) => {
-      const keyboardEvent = event as KeyboardEvent;
-      if (keyboardEvent.repeat) return;
-      if (
-        !(keyboardEvent.ctrlKey || keyboardEvent.metaKey) ||
-        !keyboardEvent.altKey ||
-        !keyboardEvent.shiftKey
-      )
-        return;
-      if (keyboardEvent.key.toLowerCase() !== "v") return;
-      if (isEditableKeyboardTarget(keyboardEvent.target)) return;
-
-      keyboardEvent.preventDefault();
-      setVoiceHardwareDebugPanelOpen((prev) => !prev);
-    };
-
-    keyboardTarget.addEventListener("keydown", handleKeyDown);
-    return () => keyboardTarget.removeEventListener?.("keydown", handleKeyDown);
   }, [currentUserId, voiceHardwareDebugPanelEnabled]);
 
   React.useEffect(() => {

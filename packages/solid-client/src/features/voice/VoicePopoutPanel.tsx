@@ -44,7 +44,7 @@ export function VoicePopoutPanel(props: {
           <ParticipantRow
             name={`${props.mirror.selfDisplayName} (you)`}
             avatarUrl={props.mirror.selfAvatarUrl}
-            speaking={false}
+            speaking={props.mirror.localSpeaking ?? false}
             muted={props.mirror.isMuted}
           />
           <For each={props.mirror.participants}>

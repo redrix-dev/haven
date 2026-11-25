@@ -2,7 +2,7 @@
 #
 # Each lane runs on its own runner, so each must install independently. To keep
 # that cheap we cache node_modules (root + apps/mobile) keyed on the two
-# lockfiles: on a hit we skip `npm ci` / `setup:mobile` entirely; on a miss we
+# lockfiles and install hooks: on a hit we skip `npm ci` / `setup:mobile`; on a miss we
 # install and the cache is populated for the next run. `npm ci` never mutates a
 # lockfile, so the caller's "Lockfile discipline" check stays valid either way.
 name: "Setup workspace"
@@ -10,9 +10,12 @@ description: "Node 24 with cached root and mobile dependencies"
 runs:
   using: "composite"
   steps:
+    # The exact version in .nvmrc, not "24": a bare major accepts whatever 24.x
+    # the runner image already caches, which can predate a security release
+    # (24.22.1 carries the eMudhra CA distrust).
     - uses: actions/setup-node@v4
       with:
-        node-version: 24
+        node-version-file: .nvmrc
 
     # Honor the npm pinned in package.json's "packageManager" so every lane
     # runs the same npm contributors use (prevents lockfile-drift false reds —
@@ -31,7 +34,9 @@ runs:
         path: |
           node_modules
           apps/mobile/node_modules
-        key: nm-${{ runner.os }}-node24-${{ hashFiles('package-lock.json', 'apps/mobile/package-lock.json') }}
+        # Cached dependencies include postinstall mutations. Invalidate them when
+        # a hook or patch changes, even if dependency versions stay the same.
+        key: nm-${{ runner.os }}-node24-${{ hashFiles('package-lock.json', 'apps/mobile/package-lock.json', 'package.json', 'apps/mobile/package.json', 'apps/mobile/patches/**', 'tooling/scripts/mobile/*.mjs') }}
 
     - name: Install dependencies
       if: steps.cache.outputs.cache-hit != 'true'

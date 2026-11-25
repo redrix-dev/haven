@@ -1,6 +1,6 @@
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { createEffect, createMemo, createSignal, splitProps } from "solid-js";
 import { VList, type VListHandle } from "virtua/solid";
-import type { MessageViewItem } from "./messageViewModel";
+import type { MessageViewItem } from "@shared/features/messaging/messageViewModel";
 import { MessageRow, type MessageRowActions } from "./MessageRow";
 
 /**
@@ -18,8 +18,15 @@ export function MessageList(
   props: {
     items: MessageViewItem[];
     onReachTop?: () => void;
+    /** Near the end of a window scrolled back in history: page forward. */
+    onReachBottom?: () => void;
   } & MessageRowActions,
 ) {
+  const [, rowActions] = splitProps(props, [
+    "items",
+    "onReachTop",
+    "onReachBottom",
+  ]);
   let handle: VListHandle | undefined;
   // Plain mutables, deliberately non-reactive: read inside callbacks/effects
   // only, and re-render must not depend on them.
@@ -66,8 +73,10 @@ export function MessageList(
 
   const onScroll = (offset: number) => {
     if (!handle) return;
-    stuckToBottom = offset + handle.viewportSize >= handle.scrollSize - 48;
+    const fromBottom = handle.scrollSize - (offset + handle.viewportSize);
+    stuckToBottom = fromBottom <= 48;
     if (initialScrolled && offset < 120) props.onReachTop?.();
+    if (initialScrolled && fromBottom < 120) props.onReachBottom?.();
   };
 
   return (
@@ -86,13 +95,7 @@ export function MessageList(
             <span class="h-px flex-1 bg-border" />
           </div>
         ) : (
-          <MessageRow
-            item={item}
-            viewerId={props.viewerId}
-            canReport={props.canReport}
-            onReportMessage={props.onReportMessage}
-            onReportUser={props.onReportUser}
-          />
+          <MessageRow item={item} {...rowActions} />
         )
       }
     </VList>
