@@ -534,21 +534,23 @@ After the migrations are applied to a hosted project:
    "Previously used".
 7. **Onboarding campaigns** (the mobile alpha's required "join the testers"
    screen). Campaigns are data, not migrations: no migration creates one, and
-   a reset deletes them. The reset on 2026-11-24 deleted the alpha campaign,
-   so new iOS accounts see only the terms screen (which the migrations do
-   create, version `2026-03-24`). **TODO (HAV-27):** add it back once a new
-   TestFlight build is out.
+   a reset deletes them. The reset on 2026-11-24 deleted the alpha campaign;
+   it was added back on 2026-11-25 (HAV-27) as below. New iOS accounts see
+   the terms screen first (the migrations create terms version
+   `2026-03-24`), then the campaign.
    1. In the app, signed in as the founder's own account, create the
       testers' community. A campaign points at a real community, and
-      communities are made through the app.
+      communities are made through the app. Today it is
+      `Haven TestFlight Alpha`.
    2. Add the campaign. `supabase/seeds/dev/10_community.sql`
       (`dev_join_hearth`) is the same thing for the dev backend:
       ```sql
-      insert into public.onboarding_campaigns (key, title, description, required, community_id, platforms)
+      insert into public.onboarding_campaigns
+        (key, title, description, required, community_id, platforms, min_app_version)
       select 'alpha_join_testers', 'Join the testers',
              'Haven is in alpha. Finishing this joins you to the testers'' community.',
-             true, c.id, '{ios}'
-      from public.communities c where c.name = '<the testers'' community>';
+             true, c.id, '{ios}', '0.1.0'
+      from public.communities c where c.name = 'Haven TestFlight Alpha';
       ```
       Add `flair_id` to hand out a flair on finishing (the flair is an
       operator insert into `public.flairs` first).
@@ -556,10 +558,10 @@ After the migrations are applied to a hosted project:
       after the terms, cannot be skipped, and finishing it joins the
       community.
 
-   Set neither `min_app_version` nor `distributions`. The app reports its
-   version from `apps/mobile/app.json`, which is `0.0.0`, so a minimum hides
-   the campaign from everyone; and it always reports its distribution as
-   `all`, so a `testflight` filter never matches
+   The app reports the `version` in `apps/mobile/app.json` (`0.1.0` from the
+   first TestFlight build on the rebuilt database), so `min_app_version`
+   keeps a campaign off older builds. Never set `distributions`: the app
+   always reports `all`, so a `testflight` filter never matches
    (`apps/mobile/src/features/onboarding/mobileOnboardingContext.ts`). What is
    offered is decided by `private.onboarding_is_offered`.
 
