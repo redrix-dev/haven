@@ -94,3 +94,8 @@
 11 @@ a scanner match is not flagged @@ select pg_temp.mutate('public.worker_record_media_scan(uuid,public.media_scan_status,text,jsonb)', $m$perform private.flag_csam(v_case_id, null);$m$, $m$$m$);
 11 @@ a scanner match on a picture leaves it on the profile @@ select pg_temp.mutate('private.remove_case_content(public.platform_cases)', $m$elsif exists (select 1 from public.case_media cm where cm.case_id = p_case.id and cm.media_id = v_avatar) then$m$, $m$elsif false then$m$);
 11 @@ a scanner match does not hold the matched file @@ select pg_temp.mutate('public.worker_record_media_scan(uuid,public.media_scan_status,text,jsonb)', $m$insert into public.case_media (case_id, media_id) values (v_case_id, p_media_id) on conflict do nothing;$m$, $m$$m$);
+11 @@ staff list the people of a case about their own account @@ select pg_temp.mutate('public.staff_case_people(uuid)', $m$if not private.can_read_case(p_case_id, v_me) then$m$, $m$if false then$m$);
+11 @@ anyone signed in lists the people of a case @@ select pg_temp.mutate('public.staff_case_people(uuid)', $m$v_me uuid := private.require_staff();$m$, $m$v_me uuid := private.require_account();$m$);
+11 @@ the people of a case include people it does not involve @@ select pg_temp.mutate('public.staff_case_people(uuid)', $m$where p.id in ($m$, $m$where true or p.id in ($m$);
+11 @@ the people of a case leave out who it is about @@ select pg_temp.mutate('public.staff_case_people(uuid)', $m$select c.subject_user_id from public.platform_cases c where c.id = p_case_id$m$, $m$select null::uuid$m$);
+11 @@ the people of a case leave out who worked it @@ select pg_temp.mutate('public.staff_case_people(uuid)', $m$union select e.actor_id from public.platform_case_events e where e.case_id = p_case_id$m$, $m$$m$);

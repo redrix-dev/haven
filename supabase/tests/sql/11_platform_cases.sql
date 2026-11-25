@@ -165,6 +165,29 @@ select test_support.assert_query_count(
             or (e.kind = 'note' and e.detail ->> 'body' = 'Looked at it.')) $$, 2,
   'each step is added to the log with who did it');
 
+-- Who the case involves: the reporter, the person it is about, and everyone
+-- in its log. Staff accounts cannot read profiles any other way.
+create temp table involved as
+  select string_agg(p.username, ',' order by p.username) as names from public.profiles p
+  where p.id in (test_support.user_id('member_a'), test_support.user_id('member_b'), test_support.user_id('staff_active'));
+grant select on involved to public;
+select test_support.become('staff_active', 'aal2');
+select test_support.assert_eq_text(
+  (select string_agg(p.username, ',' order by p.username) from public.staff_case_people((select id from filed)) p),
+  (select names from involved),
+  'staff see who a case involves, and nobody else');
+select test_support.expect_error(
+  $$ select * from public.staff_case_people((select id from about_staff)) $$, 'case_not_found');
+select test_support.expect_error(
+  $$ select * from public.staff_case_people(gen_random_uuid()) $$, 'case_not_found');
+select test_support.become('staff_active');
+select test_support.expect_error(
+  $$ select * from public.staff_case_people((select id from filed)) $$, 'second_factor_required');
+select test_support.become('staff_person');
+select test_support.expect_error(
+  $$ select * from public.staff_case_people((select id from filed)) $$, 'staff_only');
+select test_support.become(null);
+
 -- ── Evidence ────────────────────────────────────────────────────────────────
 -- A second file on the same case, to show that opening one does not open both.
 select test_support.become('member_b');

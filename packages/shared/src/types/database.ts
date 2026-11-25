@@ -2722,6 +2722,16 @@ export type Database = {
         Args: { p_body: string; p_case_id: string }
         Returns: undefined
       }
+      staff_case_people: {
+        Args: { p_case_id: string }
+        Returns: Database["public"]["CompositeTypes"]["profile_record"][]
+        SetofOptions: {
+          from: "*"
+          to: "profile_record"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       staff_flag_csam: { Args: { p_case_id: string }; Returns: undefined }
       staff_record_decision: {
         Args: {

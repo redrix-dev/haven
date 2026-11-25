@@ -325,6 +325,10 @@ adds:
 - **Looking at evidence leaves a record.** Storage serves a case file only to
   a staff member who logged a view of that file in the last ten minutes
   (`staff_view_case_media`).
+- **Staff read people through the case.** A staff account cannot call
+  `get_profiles` (it never acts as a person), so `staff_case_people` returns
+  who one case involves: the person it is about and everyone in its log and
+  decisions, the reporter among them. Only for a case they may read.
 - **Apparent CSAM.** Flagging withholds the files from everyone except a CSAM
   reviewer, queues them to be moved to the `evidence` bucket, takes the
   content down, and starts a one-year hold (18 U.S.C. 2258A(h)). The hold is

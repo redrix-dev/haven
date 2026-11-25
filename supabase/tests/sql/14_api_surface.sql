@@ -44,7 +44,7 @@ select test_support.assert_eq_text(
       'list_community_reports', 'set_community_report_status', 'add_community_report_note', 'escalate_community_report',
       -- Haven staff (each checks that the caller is staff)
       'staff_set_case_status', 'staff_add_case_note', 'staff_record_decision', 'staff_reverse_decision',
-      'staff_flag_csam', 'staff_record_ncmec_report', 'staff_view_case_media',
+      'staff_flag_csam', 'staff_record_ncmec_report', 'staff_view_case_media', 'staff_case_people',
       -- operations
       'get_my_feature_flags', 'list_my_onboarding', 'answer_onboarding', 'get_my_profile'
     ]),
