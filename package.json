@@ -150,7 +150,7 @@
     "livekit-client": "^2.19.2",
     "lucide-solid": "^1.17.0",
     "marked": "^18.0.5",
-    "solid-js": "^1.9.13",
+    "solid-js": "^2.0.3",
     "tailwind-merge": "^3.4.1",
     "virtua": "^0.49.1",
     "zustand": "^5.0.12"
